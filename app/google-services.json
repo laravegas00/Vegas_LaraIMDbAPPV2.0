@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "986395750131",
+    "project_id": "laravegas-90930",
+    "storage_bucket": "laravegas-90930.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:986395750131:android:36a5f54bf581ff79565186",
+        "android_client_info": {
+          "package_name": "edu.pmdm.vegas_laraimdbapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "986395750131-23hhf4gmvtcqdobs88qkcg5pcovhl8gh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "edu.pmdm.vegas_laraimdbapp",
+            "certificate_hash": "9b9520e80159316d50433b873e78fa7f8af57ef6"
+          }
+        },
+        {
+          "client_id": "986395750131-6e9kalopnk5kdliork05l891de3kib1e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "edu.pmdm.vegas_laraimdbapp",
+            "certificate_hash": "fef1450d765df2cf93288011f1fa298bf7050cb7"
+          }
+        },
+        {
+          "client_id": "986395750131-hmkse2gemgv6aao3b0qof6dkv81jdrkl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "edu.pmdm.vegas_laraimdbapp",
+            "certificate_hash": "f6c0d488676480cebab6659eb6aa93b3afe43dbd"
+          }
+        },
+        {
+          "client_id": "986395750131-ctl08fgv57b6pe99sv23u2goirjllc5q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-16gk8ExQ-ry8NfovehzNpa_udkEOWnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "986395750131-ctl08fgv57b6pe99sv23u2goirjllc5q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
