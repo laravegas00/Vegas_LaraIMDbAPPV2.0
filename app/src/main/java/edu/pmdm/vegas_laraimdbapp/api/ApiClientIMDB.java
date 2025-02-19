@@ -29,20 +29,24 @@ public class ApiClientIMDB {
                         @Override
                         public Response intercept(Chain chain) throws IOException {
                             Request original = chain.request();
-                            Request request = original.newBuilder()
-                                    .header("X-RapidAPI-Key", RapidApiKeyManager.getApiKey()) // Usar la API Key desde la clase
-                                    .header("X-RapidAPI-Host", "imdb-com.p.rapidapi.com")
-                                    .build();
+                            Response response = null;
+                            int retryCount = 0;
 
-                            Response response = chain.proceed(request);
-
-                            // Si la API Key actual alcanza su límite (Código 429), cambia a la siguiente
-                            if (response.code() == 429) {
-                                RapidApiKeyManager.switchToNextApiKey(); // Cambia a la siguiente API Key
-                                Request newRequest = original.newBuilder()
-                                        .header("X-RapidAPI-Key", RapidApiKeyManager.getApiKey())
+                            while (retryCount < 2) { // Intentamos solo una vez más si falla con 429
+                                String apiKey = RapidApiKeyManager.getApiKey();
+                                Request request = original.newBuilder()
+                                        .header("X-RapidAPI-Key", apiKey) // API Key actual
+                                        .header("X-RapidAPI-Host", "imdb-com.p.rapidapi.com")
                                         .build();
-                                return chain.proceed(newRequest);
+
+                                response = chain.proceed(request);
+
+                                if (response.code() == 429) { // Si la API Key está limitada
+                                    RapidApiKeyManager.switchToNextApiKey(); // Cambia a la siguiente API Key
+                                    retryCount++; // Aumentamos el contador de reintentos
+                                } else {
+                                    break; // Si la respuesta es válida, salimos del bucle
+                                }
                             }
 
                             return response;
