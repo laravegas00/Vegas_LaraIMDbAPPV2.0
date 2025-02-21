@@ -60,5 +60,6 @@ dependencies {
 
     implementation ("com.squareup.picasso:picasso:2.71828")
 
+    implementation ("com.facebook.android:facebook-login:latest.release")
 
 }

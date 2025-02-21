@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,6 +17,13 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.facebook.AccessToken;
+import com.facebook.CallbackManager;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
+import com.facebook.login.LoginManager;
+import com.facebook.login.LoginResult;
+import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -23,34 +31,44 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.FacebookAuthProvider;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
- * Actividad de inicio de sesión de Google.
+ * Actividad de inicio de sesión con Google y Facebook.
  */
 public class LogInActivity extends AppCompatActivity {
 
-    // Declaración de variables
+    // Google Sign-In
     private GoogleSignInClient mGoogleSignInClient;
     private static final int RC_SIGN_IN = 100;
 
+    // Facebook Sign-In
+    private CallbackManager callbackManager;
+    private FirebaseAuth firebaseAuth;
+    private LoginButton fbLoginButton;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_log_in);
 
+        // Inicializar FirebaseAuth
+        firebaseAuth = FirebaseAuth.getInstance();
 
         // Verificar si hay una cuenta de Google activa
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         if (account != null) {
             // Si hay una cuenta activa, redirigir automáticamente a MainActivity
-            Intent intent = new Intent(this, MainActivity.class);
-            intent.putExtra("name", account.getDisplayName());
-            intent.putExtra("email", account.getEmail());
-            intent.putExtra("userId", account.getId()); // Pasar el userId a MainActivity
-            startActivity(intent);
-            finish();
+            String name = account.getDisplayName();
+            String email = account.getEmail();
+            String photoUrl = (account.getPhotoUrl() != null) ? account.getPhotoUrl().toString() : null;
+
+            redirigirAMainActivity(name, email, photoUrl);
         }
 
         // Configurar el cliente de autenticación de Google
@@ -70,12 +88,49 @@ public class LogInActivity extends AppCompatActivity {
             startActivityForResult(signInIntent, RC_SIGN_IN);
         });
 
+        // 🔹 Verificar si hay una sesión activa de Facebook en Firebase
+        FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
+        if (firebaseUser != null) {
+            String name = firebaseUser.getDisplayName();
+            String email = firebaseUser.getEmail();
+            String photoUrl = (firebaseUser.getPhotoUrl() != null) ? firebaseUser.getPhotoUrl().toString() : null;
+
+            redirigirAMainActivity(name, email, photoUrl);
+            return;
+        }
+
+        // 🔹 Configurar Facebook Sign-In sin cambiar el botón
+        callbackManager = CallbackManager.Factory.create();
+        fbLoginButton = findViewById(R.id.fb_login_button);
+        fbLoginButton.setPermissions(Arrays.asList("email", "public_profile"));
+        fbLoginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
+            @Override
+            public void onSuccess(LoginResult loginResult) {
+                Log.d(TAG, "Facebook login exitoso: " + loginResult);
+                handleFacebookAccessToken(loginResult.getAccessToken());
+            }
+
+            @Override
+            public void onCancel() {
+                Toast.makeText(LogInActivity.this, "Inicio de sesión con Facebook cancelado", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onError(FacebookException error) {
+                Log.e(TAG, "Error en el inicio de sesión con Facebook", error);
+                Toast.makeText(LogInActivity.this, "Error en Facebook Sign-In", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Adaptar UI para evitar solapamientos con barras del sistema
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
     }
+
+
 
     /**
      * Método para establecer el texto del botón de inicio de sesión de Google.
@@ -92,72 +147,92 @@ public class LogInActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Maneja el token de acceso de Facebook y autentica en Firebase.
+     */
+    private void handleFacebookAccessToken(AccessToken token) {
+        Log.d(TAG, "handleFacebookAccessToken:" + token);
+
+        AuthCredential credential = FacebookAuthProvider.getCredential(token.getToken());
+        firebaseAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        if (user != null) {
+                            // Extraer datos del usuario de Facebook
+                            String name = user.getDisplayName();
+                            String email = user.getEmail();
+                            String photoUrl = (user.getPhotoUrl() != null) ? user.getPhotoUrl().toString() : null;
+
+                            // Guardar los datos en SharedPreferences
+                            guardarCorreo(email);
+
+                            // Redirigir a MainActivity con los datos
+                            redirigirAMainActivity(name, email, photoUrl);
+                        }
+                    } else {
+                        Log.w(TAG, "Error en autenticación Firebase con Facebook", task.getException());
+                        Toast.makeText(LogInActivity.this, "Error al autenticar con Firebase", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        // Manejar el resultado del inicio de sesión de Google
+        // Manejar resultado de Google Sign-In
         if (requestCode == RC_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             handleSignInResult(task);
         }
+
+        // Manejar resultado de Facebook Sign-In
+        callbackManager.onActivityResult(requestCode, resultCode, data);
     }
 
     /**
-     * Método para manejar el resultado del inicio de sesión de Google.
+     * Manejo del inicio de sesión de Google.
      */
     private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
         try {
-            // Obtener la cuenta de Google si el inicio de sesión fue exitoso
             GoogleSignInAccount account = completedTask.getResult(ApiException.class);
-            // Mostrar información del usuario en la consola
             if (account != null) {
-                // Mostrar información del usuario en la consola
-                String name = account.getDisplayName();
-                String email = account.getEmail();
-                String photoUrl = (account.getPhotoUrl() != null) ? account.getPhotoUrl().toString() : null;
-
-                guardarCorreo(email); // Guardar el correo en SharedPreferences
-
-                //Mandar la información a la MainActivity
-                Intent intent = new Intent(this, MainActivity.class);
-                intent.putExtra("name", name);
-                intent.putExtra("email", email);
-                intent.putExtra("photoUrl", photoUrl);
-                startActivity(intent);
-                finish();
-
-                Log.w(TAG, "USUARIO LOGEADO");
+                guardarCorreo(account.getEmail());
+                redirigirAMainActivity(account.getDisplayName(), account.getEmail(), account.getId());
             }
         } catch (ApiException e) {
-            Log.w(TAG, "signInResult:failed code=" + e.getStatusCode());
+            Log.w(TAG, "Error en Google Sign-In: " + e.getStatusCode());
         }
     }
 
     /**
-     * Método para guardar el correo en SharedPreferences.
-     * @param email El correo a guardar.
+     * Redirige a MainActivity después de un inicio de sesión exitoso.
      */
-    public void guardarCorreo(String email) {
-
-        // Obtener las preferencias compartidas
-        SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit(); // Editar las preferencias
-
-        // Generar un userId único basado en el email
-        String userId = generateUserId(email);
-
-        // Guardar los datos actualizados en SharedPreferences
-        editor.putString("USER_EMAIL", email);
-        editor.putString("USER_ID", userId);
-        editor.apply();
-
-        Log.d("LogInActivity", "Usuario guardado en SharedPreferences: " + email + " | ID: " + userId);
+    private void redirigirAMainActivity(String name, String email, String photoUrl) {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("name", name);
+        intent.putExtra("email", email);
+        intent.putExtra("photoUrl", photoUrl);
+        startActivity(intent);
+        finish();
     }
 
-    // Método para generar un ID único basado en el email
+
+    /**
+     * Guarda el correo del usuario en SharedPreferences.
+     */
+    public void guardarCorreo(String email) {
+        SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString("USER_EMAIL", email);
+        editor.putString("USER_ID", generateUserId(email));
+        editor.apply();
+        Log.d("LogInActivity", "Usuario guardado: " + email);
+    }
+
     private String generateUserId(String email) {
         return UUID.nameUUIDFromBytes(email.getBytes()).toString();
     }
-
 }

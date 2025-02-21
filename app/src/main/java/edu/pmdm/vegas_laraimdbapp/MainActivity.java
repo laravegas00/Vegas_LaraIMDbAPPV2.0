@@ -12,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.facebook.login.LoginManager;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
@@ -98,13 +99,16 @@ public class MainActivity extends AppCompatActivity {
             // Cerrar sesión de Firebase (si lo usas)
             FirebaseAuth.getInstance().signOut();
 
+            // Cerrar sesión de Facebook (🔹 Esta es la única línea agregada)
+            LoginManager.getInstance().logOut();
+
             // Eliminar datos de SharedPreferences
             SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = sharedPreferences.edit();
             editor.clear(); // Elimina todos los datos guardados
             editor.apply();
 
-            //Mostrar mensaje de cierre de sesión
+            // Mostrar mensaje de cierre de sesión
             Toast.makeText(this, "Sesión cerrada correctamente", Toast.LENGTH_SHORT).show();
 
             // Redirigir al usuario a la pantalla de inicio de sesión
@@ -113,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
             finish(); // Finalizar MainActivity
         });
     }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

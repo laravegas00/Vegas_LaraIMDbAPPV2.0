@@ -1,5 +1,6 @@
 package edu.pmdm.vegas_laraimdbapp.api;
 
+import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,11 +9,18 @@ public class RapidApiKeyManager {
     private static final List<String> apiKeys = new ArrayList<>();
     private static int currentKeyIndex = 0;
 
-    public RapidApiKeyManager() {
-        // Añade aquí tus claves de RapidAPI
-        apiKeys.add("9c04b1a854msh2056acaabc5ce24p142c9djsnbdd53d066b65");
-        apiKeys.add("e5ee42f022msh9ad047aadbacaf3p1149a6jsne6411b65c0ea");
-        apiKeys.add("TU_API_KEY_3");
+    // Bloque estático para inicializar API Keys automáticamente
+    static {
+        initializeKeys();
+    }
+
+    private static void initializeKeys() {
+        if (apiKeys.isEmpty()) {
+            apiKeys.add("9c04b1a854msh2056acaabc5ce24p142c9djsnbdd53d066b65");
+            apiKeys.add("e5ee42f022msh9ad047aadbacaf3p1149a6jsne6411b65c0ea");
+
+            Log.d("RapidApiKeyManager", "API Keys inicializadas: " + apiKeys.size());
+        }
     }
 
     /**
@@ -20,6 +28,11 @@ public class RapidApiKeyManager {
      * @return La API Key actual.
      */
     public static String getApiKey() {
+        if (apiKeys.isEmpty()) {
+            Log.e("RapidApiKeyManager", "No hay API Keys disponibles.");
+            throw new IllegalStateException("No hay API Keys disponibles. Verifica RapidApiKeyManager.");
+        }
+        Log.d("RapidApiKeyManager", "Usando API Key: " + apiKeys.get(currentKeyIndex));
         return apiKeys.get(currentKeyIndex);
     }
 
@@ -27,7 +40,11 @@ public class RapidApiKeyManager {
      * Cambia a la siguiente API Key en caso de que la actual haya alcanzado su límite.
      */
     public static void switchToNextApiKey() {
+        if (apiKeys.isEmpty()) {
+            Log.e("RapidApiKeyManager", "No hay API Keys disponibles para cambiar.");
+            throw new IllegalStateException("No hay API Keys disponibles para cambiar.");
+        }
         currentKeyIndex = (currentKeyIndex + 1) % apiKeys.size();
+        Log.d("RapidApiKeyManager", "Cambiando a nueva API Key: " + apiKeys.get(currentKeyIndex));
     }
-
 }
