@@ -1,9 +1,18 @@
 package edu.pmdm.vegas_laraimdbapp.database;
 
+import static android.content.ContentValues.TAG;
+
 import android.content.Context;
 import android.util.Log;
 
+
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 
@@ -16,12 +25,17 @@ public class FavoritesManager {
     private static FavoritesManager instance;
     private FavoriteDatabase fBD; // Base de datos de películas favoritas
 
+    private FirebaseFirestore db; // Firestore
+    private String userId; // Usuario autenticado
+
     /**
      * Constructor privado para evitar instanciación externa
      * @param context Contexto de la aplicación
      */
     private FavoritesManager(Context context) {
         fBD = new FavoriteDatabase(context);
+        db = FirebaseFirestore.getInstance();
+        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
     }
 
     /**
@@ -57,6 +71,22 @@ public class FavoritesManager {
         } else {
             fBD.addFavorite(movie, userId);
             Log.i("FavoritesManager", "Película añadida a favoritos de usuario: " + userId);
+
+            // Guardar en Firestore
+            CollectionReference favoritesRef = db.collection("users").document(userId).collection("favorites");
+            Map<String, Object> movieData = new HashMap<>();
+            movieData.put("movieId", movie.getId());
+            movieData.put("title", movie.getTitle());
+            movieData.put("imageUrl", movie.getImage());
+            movieData.put("releaseDate", movie.getReleaseDate());
+            movieData.put("plot", movie.getPlot());
+            movieData.put("rating", movie.getRating());
+
+            favoritesRef.document(movie.getId()).set(movieData)
+                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Película añadida a Firestore: " + movie.getTitle()))
+                    .addOnFailureListener(e -> Log.e(TAG, "Error al añadir a Firestore", e));
+
+
             return false;
         }
     }
@@ -68,6 +98,14 @@ public class FavoritesManager {
      */
     public void removeFavorite(Movie movie, String userId) {
         fBD.removeFavorite(movie.getId(), userId);
+
+        // Eliminar de Firestore
+        db.collection("users").document(userId).collection("favorites").document(movie.getId())
+                .delete()
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Película eliminada de Firestore"))
+                .addOnFailureListener(e -> Log.e(TAG, "Error al eliminar de Firestore", e));
+
+
     }
 
     /**

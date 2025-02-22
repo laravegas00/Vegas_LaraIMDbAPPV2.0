@@ -19,7 +19,7 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
 
     //Constantes para la base de datos
     private static final String DATABASE_NAME = "favoritesmovies.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     //Constantes para la tabla de películas favoritas
     private static final String TABLE_FAVORITES = "favorites";
@@ -67,7 +67,7 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
      */
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 3) {
+        if (oldVersion < 4) {
             try {
                 db.execSQL("ALTER TABLE " + TABLE_FAVORITES + " ADD COLUMN " + COLUMN_USERID + " TEXT DEFAULT 'unknown_user'");
                 Log.d("Database Upgrade", "Columna 'userid' añadida.");

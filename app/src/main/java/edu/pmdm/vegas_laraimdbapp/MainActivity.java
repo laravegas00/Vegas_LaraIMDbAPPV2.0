@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.Menu;
 import android.widget.Button;
@@ -27,6 +29,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
 import edu.pmdm.vegas_laraimdbapp.databinding.ActivityMainBinding;
+import edu.pmdm.vegas_laraimdbapp.sync.FavoritesSyncManager;
 
 /**
  * Actividad principal de la aplicación.
@@ -36,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     // Declaración de variables
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +82,12 @@ public class MainActivity extends AppCompatActivity {
         Glide.with(this)
                 .load(photoUrl != null ? photoUrl : "https://lh3.googleusercontent.com/a/default-user")
                 .into(photoImageView);
+
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            FavoritesSyncManager syncManager = new FavoritesSyncManager(this);
+            syncManager.syncLocalWithFirestore(this);
+        }, 5000); // ✅ Espera 5 segundos antes de sincronizar
+
 
         // Configurar el botón de logout
         Button logoutButton = headerView.findViewById(R.id.nav_header_logout_button);
