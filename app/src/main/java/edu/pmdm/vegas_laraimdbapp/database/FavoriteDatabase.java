@@ -8,7 +8,9 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 
@@ -17,9 +19,11 @@ import edu.pmdm.vegas_laraimdbapp.models.Movie;
  */
 public class FavoriteDatabase extends SQLiteOpenHelper {
 
+    private final Context context;
+
     //Constantes para la base de datos
     private static final String DATABASE_NAME = "favoritesmovies.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     //Constantes para la tabla de películas favoritas
     private static final String TABLE_FAVORITES = "favorites";
@@ -33,12 +37,21 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
     private static final String COLUMN_RATING = "rating";
     private static final String COLUMN_USERID = "userId";
 
+    // Nueva tabla para usuarios
+    public static final String TABLE_USERS = "users";
+    public static final String COLUMN_USER_ID = "userId";
+    public static final String COLUMN_NAME = "name";
+    public static final String COLUMN_EMAIL = "email";
+    public static final String COLUMN_LAST_LOGIN = "last_login";
+    public static final String COLUMN_LAST_LOGOUT = "last_logout";
+
     /**
      * Constructor de la clase
      * @param context Contexto de la aplicación
      */
     public FavoriteDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        this.context = context;
     }
 
     /**
@@ -57,6 +70,17 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
                 COLUMN_USERID + " TEXT, " +
                 "PRIMARY KEY (" + COLUMN_ID + ", " + COLUMN_USERID + "))";
         db.execSQL(createTable);
+
+        // Crear tabla de usuarios
+        String createUsersTable = "CREATE TABLE " + TABLE_USERS + " (" +
+                COLUMN_USER_ID + " TEXT PRIMARY KEY, " +
+                COLUMN_NAME + " TEXT, " +
+                COLUMN_EMAIL + " TEXT, " +
+                COLUMN_LAST_LOGIN + " TEXT, " +
+                COLUMN_LAST_LOGOUT + " TEXT" +
+                ");";
+        db.execSQL(createUsersTable);
+
     }
 
     /**
@@ -67,13 +91,15 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
      */
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 4) {
-            try {
-                db.execSQL("ALTER TABLE " + TABLE_FAVORITES + " ADD COLUMN " + COLUMN_USERID + " TEXT DEFAULT 'unknown_user'");
-                Log.d("Database Upgrade", "Columna 'userid' añadida.");
-            } catch (Exception e) {
-                Log.e("Database Upgrade", "Error al agregar 'userid': " + e.getMessage());
-            }
+        if (oldVersion < 5) {
+            String createUsersTable = "CREATE TABLE IF NOT EXISTS " + TABLE_USERS + " (" +
+                    COLUMN_USER_ID + " TEXT PRIMARY KEY, " +
+                    COLUMN_NAME + " TEXT, " +
+                    COLUMN_EMAIL + " TEXT, " +
+                    COLUMN_LAST_LOGIN + " TEXT, " +
+                    COLUMN_LAST_LOGOUT + " TEXT" +
+                    ");";
+            db.execSQL(createUsersTable);
         }
     }
 
@@ -188,4 +214,67 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
             Log.e("FavoriteDatabase", "Error al eliminar película: " + e.getMessage());
         }
     }
+
+    public void addUser(String userId, String name, String email, String lastLogin, String lastLogout) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_USER_ID, userId);
+        values.put(COLUMN_NAME, name);
+        values.put(COLUMN_EMAIL, email);
+        values.put(COLUMN_LAST_LOGIN, lastLogin);
+        values.put(COLUMN_LAST_LOGOUT, lastLogout);
+
+        try {
+            long result = db.insert(TABLE_USERS, null, values);
+            if (result == -1) {
+                Log.e("FavoriteDatabase", "Error al agregar el usuario: " + userId);
+            } else {
+                Log.d("FavoriteDatabase", "Usuario agregado con éxito: " + userId);
+            }
+        } catch (Exception e) {
+            Log.e("FavoriteDatabase", "Error al insertar usuario: " + e.getMessage());
+        }
+    }
+
+    public void updateUser(String userId, String name, String email, String lastLogin, String lastLogout) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        if (name != null) values.put(COLUMN_NAME, name);
+        if (email != null) values.put(COLUMN_EMAIL, email);
+        if (lastLogin != null) values.put(COLUMN_LAST_LOGIN, lastLogin);
+        if (lastLogout != null) values.put(COLUMN_LAST_LOGOUT, lastLogout);
+
+        db.update(TABLE_USERS, values, COLUMN_USER_ID + "=?", new String[]{userId});
+    }
+
+    public boolean userExists(String userId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String selection = COLUMN_USER_ID + " = ?";
+        String[] selectionArgs = {userId};
+
+        Cursor cursor = db.query(TABLE_USERS, null, selection, selectionArgs, null, null, null);
+        boolean exists = (cursor != null && cursor.getCount() > 0);
+
+        if (cursor != null) {
+            cursor.close();
+        }
+        return exists;
+    }
+
+    public void registerLogin(String userId, String loginTime) {
+        if (userExists(userId)) {
+            updateUser(userId, null, null, loginTime, null);
+        } else {
+            addUser(userId, null, null, loginTime, null);
+        }
+    }
+
+    public void registerLogout(String userId, String logoutTime) {
+        if (userExists(userId)) {
+            updateUser(userId, null, null, null, logoutTime);
+        } else {
+            addUser(userId, null, null, null, logoutTime);
+        }
+    }
+
 }

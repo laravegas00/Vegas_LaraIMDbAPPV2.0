@@ -20,7 +20,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
+import androidx.lifecycle.ProcessLifecycleOwner;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
@@ -28,8 +30,10 @@ import androidx.navigation.ui.NavigationUI;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
+import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 import edu.pmdm.vegas_laraimdbapp.databinding.ActivityMainBinding;
 import edu.pmdm.vegas_laraimdbapp.sync.FavoritesSyncManager;
+import edu.pmdm.vegas_laraimdbapp.utils.AppLifecycleManager;
 
 /**
  * Actividad principal de la aplicación.
@@ -39,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     // Declaración de variables
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
+    private FavoriteDatabase databaseHelper;
 
 
     @Override
@@ -49,6 +54,13 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         setSupportActionBar(binding.appBarMain.toolbar); // Configurar la Toolbar
+
+        // Inicializar la base de datos local
+        databaseHelper = new FavoriteDatabase(this);
+
+        // Inicializar Lifecycle Manager para registrar eventos del ciclo de vida
+        ProcessLifecycleOwner.get().getLifecycle().addObserver(new AppLifecycleManager(this));
+
 
         // Configurar el Navigation Drawer
         DrawerLayout drawer = binding.drawerLayout;
@@ -99,17 +111,25 @@ public class MainActivity extends AppCompatActivity {
      * Método para cerrar la sesión del usuario.
      */
     private void cerrarSesion() {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            String userId = user.getUid();
+
+            // Registrar el logout en la base de datos local
+            String logoutTime = getCurrentDateTime();
+            databaseHelper.registerLogout(userId, logoutTime);
+        }
+
         // Cerrar sesión de Google
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .build();
         GoogleSignInClient googleSignInClient = GoogleSignIn.getClient(this, gso);
-
         googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            // Cerrar sesión de Firebase (si lo usas)
+            // Cerrar sesión de Firebase
             FirebaseAuth.getInstance().signOut();
 
-            // Cerrar sesión de Facebook (🔹 Esta es la única línea agregada)
+            // Cerrar sesión de Facebook
             LoginManager.getInstance().logOut();
 
             // Eliminar datos de SharedPreferences
@@ -126,6 +146,25 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
             finish(); // Finalizar MainActivity
         });
+    }
+
+    private String getCurrentDateTime() {
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        return sdf.format(new java.util.Date());
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            String userId = user.getUid();
+            String logoutTime = getCurrentDateTime();
+
+            // Registrar el logout en la base de datos local
+            databaseHelper.registerLogout(userId, logoutTime);
+        }
     }
 
 

@@ -29,7 +29,7 @@ public class FavoritesSyncManager {
     }
 
     private CollectionReference getFavoritesCollection() {
-        return db.collection("users").document(userId).collection("favorites");
+        return db.collection("favorites").document(userId).collection("movies");
     }
 
     public void addFavoriteToFirestore(Movie movie) {
@@ -124,59 +124,4 @@ public class FavoritesSyncManager {
         });
     }
 
-    public void addActivityLog(String loginTime, String logoutTime) {
-        DocumentReference userRef = db.collection("users").document(userId);
-        userRef.get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists()) {
-                List<Map<String, Object>> activityLog = (List<Map<String, Object>>) documentSnapshot.get("activity_log");
-                if (activityLog == null) {
-                    activityLog = new ArrayList<>();
-                }
-
-                Map<String, Object> newLog = new HashMap<>();
-                newLog.put("login_time", loginTime);
-
-                if (logoutTime != null) {
-                    newLog.put("logout_time", logoutTime);
-                }
-
-                activityLog.add(newLog);
-
-                userRef.update("activity_log", activityLog)
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Historial de actividad actualizado correctamente."))
-                        .addOnFailureListener(e -> Log.e(TAG, "Error al actualizar el historial de actividad.", e));
-            } else {
-                Log.e(TAG, "Usuario no encontrado en Firestore.");
-            }
-        }).addOnFailureListener(e -> Log.e(TAG, "Error al obtener el usuario.", e));
-    }
-
-    public void fetchUserFromFirestore(Consumer<Map<String, String>> onSuccess, Consumer<Exception> onFailure) {
-        db.collection("users").document(userId).get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        Map<String, String> userData = new HashMap<>();
-                        userData.put("name", documentSnapshot.getString("name"));
-                        userData.put("email", documentSnapshot.getString("email"));
-                        userData.put("phone", documentSnapshot.getString("phone"));
-                        userData.put("address", documentSnapshot.getString("address"));
-                        userData.put("image", documentSnapshot.getString("image"));
-
-                        if (onSuccess != null) {
-                            onSuccess.accept(userData);
-                        }
-                    } else {
-                        Log.e(TAG, "Usuario no encontrado en Firestore.");
-                        if (onFailure != null) {
-                            onFailure.accept(new Exception("Usuario no encontrado en Firestore"));
-                        }
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error al obtener datos de Firestore", e);
-                    if (onFailure != null) {
-                        onFailure.accept(e);
-                    }
-                });
-    }
 }

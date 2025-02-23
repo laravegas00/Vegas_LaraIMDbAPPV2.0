@@ -39,6 +39,8 @@ import com.google.firebase.auth.FirebaseUser;
 import java.util.Arrays;
 import java.util.UUID;
 
+import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
+
 /**
  * Actividad de inicio de sesión con Google y Facebook.
  */
@@ -52,6 +54,9 @@ public class LogInActivity extends AppCompatActivity {
     private CallbackManager callbackManager;
     private FirebaseAuth firebaseAuth;
     private LoginButton fbLoginButton;
+
+    private FavoriteDatabase databaseHelper;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -59,6 +64,9 @@ public class LogInActivity extends AppCompatActivity {
 
         // Inicializar FirebaseAuth
         firebaseAuth = FirebaseAuth.getInstance();
+
+        // Inicializar la base de datos local
+        databaseHelper = new FavoriteDatabase(this);
 
         // Verificar si hay una cuenta de Google activa
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
@@ -160,9 +168,18 @@ public class LogInActivity extends AppCompatActivity {
                         FirebaseUser user = firebaseAuth.getCurrentUser();
                         if (user != null) {
                             // Extraer datos del usuario de Facebook
+                            String userId = user.getUid();
                             String name = user.getDisplayName();
                             String email = user.getEmail();
                             String photoUrl = (user.getPhotoUrl() != null) ? user.getPhotoUrl().toString() : null;
+
+                            // Registrar el login en la base de datos
+                            String loginTime = getCurrentDateTime();
+                            if (!databaseHelper.userExists(userId)) {
+                                databaseHelper.addUser(userId, name, email, loginTime, null);
+                            } else {
+                                databaseHelper.registerLogin(userId, loginTime);
+                            }
 
                             // Guardar los datos en SharedPreferences
                             guardarCorreo(email);
@@ -199,12 +216,33 @@ public class LogInActivity extends AppCompatActivity {
         try {
             GoogleSignInAccount account = completedTask.getResult(ApiException.class);
             if (account != null) {
-                guardarCorreo(account.getEmail());
-                redirigirAMainActivity(account.getDisplayName(), account.getEmail(), account.getId());
+                String userId = account.getId();
+                String name = account.getDisplayName();
+                String email = account.getEmail();
+                String photoUrl = (account.getPhotoUrl() != null) ? account.getPhotoUrl().toString() : null;
+
+                // Registrar el login en la base de datos
+                String loginTime = getCurrentDateTime();
+                if (!databaseHelper.userExists(userId)) {
+                    databaseHelper.addUser(userId, name, email, loginTime, null);
+                } else {
+                    databaseHelper.registerLogin(userId, loginTime);
+                }
+
+                // Guardar los datos en SharedPreferences
+                guardarCorreo(email);
+
+                // Redirigir a MainActivity con los datos
+                redirigirAMainActivity(name, email, photoUrl);
             }
         } catch (ApiException e) {
             Log.w(TAG, "Error en Google Sign-In: " + e.getStatusCode());
         }
+    }
+
+    private String getCurrentDateTime() {
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        return sdf.format(new java.util.Date());
     }
 
     /**
