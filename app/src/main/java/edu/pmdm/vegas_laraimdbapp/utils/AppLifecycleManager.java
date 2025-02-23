@@ -1,7 +1,6 @@
 package edu.pmdm.vegas_laraimdbapp.utils;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleObserver;
@@ -14,7 +13,6 @@ import java.text.DateFormat;
 import java.util.Date;
 
 import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
-import edu.pmdm.vegas_laraimdbapp.sync.FavoritesSyncManager;
 import edu.pmdm.vegas_laraimdbapp.sync.UserSyncManager;
 
 /**

@@ -21,7 +21,6 @@ import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
-import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -96,7 +95,7 @@ public class LogInActivity extends AppCompatActivity {
             startActivityForResult(signInIntent, RC_SIGN_IN);
         });
 
-        // 🔹 Verificar si hay una sesión activa de Facebook en Firebase
+        //Verificar si hay una sesión activa de Facebook en Firebase
         FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
         if (firebaseUser != null) {
             String name = firebaseUser.getDisplayName();
@@ -107,7 +106,7 @@ public class LogInActivity extends AppCompatActivity {
             return;
         }
 
-        // 🔹 Configurar Facebook Sign-In sin cambiar el botón
+        //Configurar Facebook Sign-In sin cambiar el botón
         callbackManager = CallbackManager.Factory.create();
         fbLoginButton = findViewById(R.id.fb_login_button);
         fbLoginButton.setPermissions(Arrays.asList("email", "public_profile"));

@@ -1,18 +1,12 @@
 package edu.pmdm.vegas_laraimdbapp.sync;
 
-import android.content.Context;
 import android.util.Log;
 
-import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.SetOptions;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 public class UserSyncManager {
@@ -55,7 +49,7 @@ public class UserSyncManager {
      */
     private void registrarEvento(DocumentReference userRef, String loginTime, String logoutTime, String eventType) {
         if (loginTime != null) {
-            // ✅ Si es un login, añadimos un nuevo objeto en el array
+            //Si es un login, añadimos un nuevo objeto en el array
             Map<String, Object> loginEvent = new HashMap<>();
             loginEvent.put("login_time", loginTime);
             loginEvent.put("logout_time", ""); // Se deja vacío hasta que ocurra un logout
@@ -67,7 +61,7 @@ public class UserSyncManager {
         }
 
         if (logoutTime != null) {
-            // ✅ Si es un logout, actualizamos el último registro de login en lugar de crear uno nuevo
+            //Si es un logout, actualizamos el último registro de login en lugar de crear uno nuevo
             userRef.get().addOnSuccessListener(documentSnapshot -> {
                 if (documentSnapshot.exists() && documentSnapshot.contains("activity_log")) {
                     Object logArray = documentSnapshot.get("activity_log");
@@ -75,7 +69,7 @@ public class UserSyncManager {
                         java.util.List<Map<String, Object>> logs = (java.util.List<Map<String, Object>>) logArray;
 
                         if (!logs.isEmpty()) {
-                            // ✅ Tomamos el último login registrado y actualizamos el logout
+                            //Tomamos el último login registrado y actualizamos el logout
                             Map<String, Object> lastLog = logs.get(logs.size() - 1);
                             lastLog.put("logout_time", logoutTime);
 
