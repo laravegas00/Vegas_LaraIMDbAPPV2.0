@@ -81,9 +81,9 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
                 COLUMN_EMAIL + " TEXT, " +
                 COLUMN_LAST_LOGIN + " TEXT, " +
                 COLUMN_LAST_LOGOUT + " TEXT, " +
-                COLUMN_ADDRESS + " TEXT, " +  // Nuevo campo
-                COLUMN_PHONE + " TEXT, " +    // Nuevo campo
-                COLUMN_IMAGE + " TEXT " +     // Nuevo campo
+                COLUMN_ADDRESS + " TEXT, " +
+                COLUMN_PHONE + " TEXT, " +
+                COLUMN_IMAGE + " TEXT " +
                 ");";
         db.execSQL(createUsersTable);
 
@@ -217,6 +217,17 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         }
     }
 
+
+    /**
+     * Agregar un usuario a la base de datos
+     * @param userId ID del usuario
+     * @param name Nombre del usuario
+     * @param email Email del usuario
+     * @param lastLogin Último inicio de sesión
+     * @param lastLogout Último cierre de sesión
+     * @param address Dirección del usuario
+     * @param phone Teléfono del usuario
+     */
     public void addUser(String userId, String name, String email, String lastLogin, String lastLogout, String address, String phone) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
@@ -238,7 +249,16 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         }
     }
 
-
+    /**
+     * Actualizar un usuario en la base de datos
+     * @param userId ID del usuario
+     * @param name Nombre del usuario
+     * @param email Email del usuario
+     * @param lastLogin Último inicio de sesión
+     * @param lastLogout Último cierre de sesión
+     * @param address Dirección del usuario
+     * @param phone Teléfono del usuario
+     */
     public void updateUser(String userId, String name, String email, String lastLogin, String lastLogout, String address, String phone, String image) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
@@ -246,12 +266,17 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         if (email != null) values.put(COLUMN_EMAIL, email);
         if (lastLogin != null) values.put(COLUMN_LAST_LOGIN, lastLogin);
         if (lastLogout != null) values.put(COLUMN_LAST_LOGOUT, lastLogout);
-        if (address != null) values.put(COLUMN_ADDRESS, address); // Nuevo campo
-        if (phone != null) values.put(COLUMN_PHONE, phone);       // Nuevo campo
-        if (image != null) values.put(COLUMN_IMAGE, image);       // Nuevo campo
+        if (address != null) values.put(COLUMN_ADDRESS, address);
+        if (phone != null) values.put(COLUMN_PHONE, phone);
+        if (image != null) values.put(COLUMN_IMAGE, image);
 
         db.update(TABLE_USERS, values, COLUMN_USER_ID + "=?", new String[]{userId});    }
 
+    /**
+     * Verificar si un usuario existe en la base de datos
+     * @param userId ID del usuario
+     * @return True si el usuario existe, false en caso contrario
+     */
     public boolean userExists(String userId) {
         SQLiteDatabase db = this.getReadableDatabase();
         String selection = COLUMN_USER_ID + " = ?";
@@ -267,7 +292,7 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
     }
 
     /**
-     * Obtener datos de un usuario
+     * Obtener datos de un usuario de la base de datos
      */
     public Map<String, String> getUser(String userId) {
         Map<String, String> userData = new HashMap<>();
@@ -292,6 +317,11 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         return userData;
     }
 
+    /**
+     * Registrar un inicio de sesión
+     * @param userId ID del usuario
+     * @param loginTime Hora del inicio de sesión
+     */
     public void registerLogin(String userId, String loginTime) {
         if (userExists(userId)) {
             updateUser(userId, null, null, loginTime, null, null, null, null);
@@ -300,6 +330,11 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Registrar un cierre de sesión
+     * @param userId ID del usuario
+     * @param logoutTime Hora del cierre de sesión
+     */
     public void registerLogout(String userId, String logoutTime) {
         if (userExists(userId)) {
             updateUser(userId, null, null, null, logoutTime, null, null, null);

@@ -19,12 +19,19 @@ import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 
+/**
+ * Clase para sincronizar las películas favoritas de Firestore con la base de datos local.
+ */
 public class FavoritesSyncManager {
     private static final String TAG = "FavoritesSyncManager";
     private final FavoritesManager favoritesManager;
     private final FirebaseFirestore db;
     private final String userId;
 
+    /**
+     * Constructor
+     * @param context Contexto de la aplicación
+     */
     public FavoritesSyncManager(Context context) {
         this.favoritesManager = FavoritesManager.getInstance(context);
         this.db = FirebaseFirestore.getInstance();
@@ -36,10 +43,18 @@ public class FavoritesSyncManager {
             userId = null;
         }    }
 
+    /**
+     * Obtener la colección de favoritos de Firestore
+     * @return Colección de favoritos de Firestore
+     */
     private CollectionReference getFavoritesCollection() {
         return db.collection("favorites").document(userId).collection("movies");
     }
 
+    /**
+     * Sincronizar las películas favoritas de Firestore con la base de datos local
+     * @param movie Película a sincronizar
+     */
     public void addFavoriteToFirestore(Movie movie) {
         CollectionReference favoritesRef = getFavoritesCollection();
         Map<String, Object> movieData = new HashMap<>();
@@ -55,6 +70,10 @@ public class FavoritesSyncManager {
                 .addOnFailureListener(e -> Log.e("Firestore", "Error al subir película", e));
     }
 
+    /**
+     * Sincronizar las películas favoritas de Firestore con la base de datos local
+     * @param context Contexto de la aplicación
+     */
     public void syncLocalWithFirestore(Context context) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -77,7 +96,6 @@ public class FavoritesSyncManager {
                     }
 
                     FavoriteDatabase database = new FavoriteDatabase(context);
-                    //database.clearFavorites(userId); // Eliminar los favoritos locales antes de sincronizar
 
                     for (DocumentSnapshot document : queryDocumentSnapshots) {
                         Movie movie = document.toObject(Movie.class);

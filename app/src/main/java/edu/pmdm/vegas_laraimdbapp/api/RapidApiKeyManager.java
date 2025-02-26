@@ -4,8 +4,12 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Manager para gestionar las API Keys de RapidAPI.
+ */
 public class RapidApiKeyManager {
 
+    // Lista de API Keys
     private static final List<String> apiKeys = new ArrayList<>();
     private static int currentKeyIndex = 0;
 
@@ -14,6 +18,9 @@ public class RapidApiKeyManager {
         initializeKeys();
     }
 
+    /**
+     * Inicializa las API Keys.
+     */
     private static void initializeKeys() {
         if (apiKeys.isEmpty()) {
             apiKeys.add("9c04b1a854msh2056acaabc5ce24p142c9djsnbdd53d066b65");

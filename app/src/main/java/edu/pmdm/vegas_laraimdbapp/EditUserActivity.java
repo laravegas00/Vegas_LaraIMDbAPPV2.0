@@ -45,9 +45,12 @@ import java.util.Map;
 import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
 import edu.pmdm.vegas_laraimdbapp.utils.KeystoreManager;
 
-
+/**
+ * Actividad para editar los datos del usuario.
+ */
 public class EditUserActivity extends AppCompatActivity {
 
+    // Constantes para el manejo de imágenes
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int CAPTURE_IMAGE_REQUEST = 2;
     private static final int SELECT_LOCATION_REQUEST = 100;
@@ -67,7 +70,7 @@ public class EditUserActivity extends AppCompatActivity {
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        // Vincular vistas
+
         editTextName = findViewById(R.id.editTextName);
         editTextPhone = findViewById(R.id.editTextPhone);
         editTextEmail = findViewById(R.id.editTextEmail);
@@ -78,10 +81,10 @@ public class EditUserActivity extends AppCompatActivity {
         Button buttonSelectImage = findViewById(R.id.buttonSelectImage);
         Button buttonSave = findViewById(R.id.buttonSave);
 
-        // Configurar CountryCodePicker con el campo de teléfono
+
         countryCodePicker.registerCarrierNumberEditText(editTextPhone);
 
-        // Listener para seleccionar imagen
+
         buttonSelectImage.setOnClickListener(v -> showImagePickerDialog());
 
         Button buttonSelectAddress = findViewById(R.id.buttonSelectLocation);
@@ -90,15 +93,18 @@ public class EditUserActivity extends AppCompatActivity {
             startActivityForResult(intent, 100); // Cambiado a 100 para que coincida
         });
 
-        // Listener para guardar datos
+
         buttonSave.setOnClickListener(v -> saveUserData());
 
-        //recuperar datos de la base de datos
+
         loadUserData();
         checkAndRequestCameraPermission();
 
     }
-    //Verifica y solicita permisos de cámara y almacenamiento.
+
+    /**
+     * Solicitar permiso de cámara si no se ha otorgado.
+     */
     private void checkAndRequestCameraPermission() {
         List<String> permissionsToRequest = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -120,7 +126,9 @@ public class EditUserActivity extends AppCompatActivity {
     }
 
 
-    //Muestra un diálogo para seleccionar entre tomar una foto o elegir de la galería.
+    /**
+     * Mostrar diálogo para seleccionar imagen.
+     */
     private void showImagePickerDialog() {
         String[] options = {"Tomar foto", "Elegir de la galería"};
         new AlertDialog.Builder(this)
@@ -134,7 +142,11 @@ public class EditUserActivity extends AppCompatActivity {
                 })
                 .show();
     }
-    //Abre la cámara para tomar una foto.
+
+
+    /**
+     * Abrir la cámara para capturar una imagen.
+     */
     private void openCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
@@ -161,7 +173,13 @@ public class EditUserActivity extends AppCompatActivity {
             startActivity(chooserIntent);
         }
     }
-    //Crea un archivo temporal para almacenar la imagen capturada por la cámara.
+
+
+    /**
+     * Crear un archivo temporal para guardar la imagen capturada.
+     * @return Archivo temporal
+     * @throws IOException Si hay un error al crear el archivo
+     */
     private File createImageFile() throws IOException {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String imageFileName = "JPEG_" + timeStamp + "_";
@@ -170,7 +188,10 @@ public class EditUserActivity extends AppCompatActivity {
         currentPhotoPath = image.getAbsolutePath();
         return image;
     }
-    //Abre la galería de imágenes para seleccionar una foto.
+
+    /**
+     * Abrir la galería para seleccionar una imagen.
+     */
     private void openGallery() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
 
@@ -186,10 +207,12 @@ public class EditUserActivity extends AppCompatActivity {
         }
     }
 
-    //procesar la imagen seleccionada
+    /**
+     * Manejar la selección de una imagen.
+     * @param imageUri Uri de la imagen seleccionada
+     */
     private void handleImageSelection(Uri imageUri) {
         if (imageUri != null) {
-            // Si la imagen viene de la galería, conviértela a un archivo local
             String localPath = saveGalleryImageToLocalFile(imageUri);
             if (localPath != null) {
                 imageViewProfile.setImageURI(Uri.fromFile(new File(localPath))); // Mostrar la imagen
@@ -202,29 +225,32 @@ public class EditUserActivity extends AppCompatActivity {
         }
     }
 
-    //coger la imagen seleccionada y guardarla como un archivo local
+    /**
+     * Guardar la imagen seleccionada en el almacenamiento interno.
+     * @param imageUri Uri de la imagen seleccionada
+     * @return Ruta del archivo local
+     */
     private String saveGalleryImageToLocalFile(Uri imageUri) {
         try {
-            // Crear un archivo temporal en el almacenamiento interno
+            // Crear un archivo temporal para guardar la imagen
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             String imageFileName = "JPEG_" + timeStamp + "_";
             File storageDir = getExternalFilesDir(null);
             File imageFile = File.createTempFile(imageFileName, ".jpg", storageDir);
 
-            // Abrir un flujo de entrada desde el URI de la galería
+            // Abrir un flujo de entrada desde la galería
             InputStream inputStream = getContentResolver().openInputStream(imageUri);
 
-            // Abrir un flujo de salida hacia el archivo local
+            // Abrir un flujo de salida para el archivo local
             OutputStream outputStream = new FileOutputStream(imageFile);
 
-            // Copiar los datos de la galería al archivo local
+            // Copiar el contenido del flujo de entrada al flujo de salida
             byte[] buffer = new byte[1024];
             int bytesRead;
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, bytesRead);
             }
 
-            // Cerrar los flujos
             inputStream.close();
             outputStream.close();
 
@@ -236,7 +262,11 @@ public class EditUserActivity extends AppCompatActivity {
             return null;
         }
     }
-    //Guardar la imagen en preferencias
+
+    /**
+     * Guardar la ruta de la imagen seleccionada en SharedPreferences.
+     * @param imagePath Ruta de la imagen
+     */
     private void saveImageToPreferences(String imagePath) {
         if (imagePath != null && !imagePath.isEmpty()) {
             SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
@@ -253,22 +283,20 @@ public class EditUserActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        // Manejo de imágenes (galería o cámara)
+        // Manejar la selección de una imagen
         if (resultCode == RESULT_OK) {
             Uri imageUri = null;
 
-            // Imagen seleccionada desde la galería
+            // Imagen seleccionada de la galería
             if (requestCode == PICK_IMAGE_REQUEST && data != null) {
                 imageUri = data.getData();
-            }
-            // Imagen tomada desde la cámara
-            else if (requestCode == CAPTURE_IMAGE_REQUEST) {
+            } else if (requestCode == CAPTURE_IMAGE_REQUEST) { // Imagen capturada por la cámara
                 File file = new File(currentPhotoPath);
                 if (file.exists()) {
                     imageUri = Uri.fromFile(file);
                     Bitmap bitmap = BitmapFactory.decodeFile(currentPhotoPath);
                     if (bitmap != null) {
-                        imageViewProfile.setImageBitmap(bitmap); // Mostrar la imagen inmediatamente
+                        imageViewProfile.setImageBitmap(bitmap);
                         saveImageToPreferences(currentPhotoPath);
                     }
                 }
@@ -280,7 +308,7 @@ public class EditUserActivity extends AppCompatActivity {
 
 
             // Manejo de la dirección seleccionada desde SelectLocationActivity
-            if (requestCode == SELECT_LOCATION_REQUEST && data != null) { //  Verificar que coincida con startActivityForResult()
+            if (requestCode == SELECT_LOCATION_REQUEST && data != null) {
                 String selectedAddress = data.getStringExtra("selectedAddress");
                 if (selectedAddress != null) {
                     TextView textViewAddress = findViewById(R.id.textViewAddress);
@@ -298,8 +326,9 @@ public class EditUserActivity extends AppCompatActivity {
         }
     }
 
-
-    //cargar la informacion del usuario y mostrarla
+    /**
+     * Cargar datos del usuario desde Firestore.
+     */
     private void loadUserData() {
         SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
         String userId = sharedPreferences.getString("userId", null);
@@ -350,7 +379,9 @@ public class EditUserActivity extends AppCompatActivity {
                 });
     }
 
-    // Guarda los datos del usuario en SQLite, Firestore y SharedPreferences.
+    /**
+     * Guardar datos del usuario en SQLite.
+     */
     private void saveUserData() {
         String name = editTextName.getText().toString().trim();
         String phone = editTextPhone.getText().toString().trim();
@@ -411,7 +442,15 @@ public class EditUserActivity extends AppCompatActivity {
         finish();
     }
 
-    //guardar los datos del usuario en Firestore
+    /**
+     * Guardar datos del usuario en Firestore.
+     * @param userId Id del usuario
+     * @param name Nombre del usuario
+     * @param email Email del usuario
+     * @param encryptedPhone Número de teléfono encriptado
+     * @param encryptedAddress Dirección encriptada
+     * @param imagePath Ruta de la imagen
+     */
     public void saveUserToFirestore(String userId, String name, String email, String encryptedPhone, String encryptedAddress, String imagePath) {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         Map<String, Object> userData = new HashMap<>();
@@ -443,7 +482,11 @@ public class EditUserActivity extends AppCompatActivity {
     }
 
 
-
+    /**
+     * Validar el nombre del usuario.
+     * @param name Nombre del usuario
+     * @return Si el nombre es válido
+     */
     private boolean validateName(String name) {
         if (name.isEmpty() || name.length() > 20 || !name.matches("^[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]+$")) {
             Toast.makeText(this, "El nombre debe ser válido y contener solo letras", Toast.LENGTH_SHORT).show();
@@ -452,6 +495,10 @@ public class EditUserActivity extends AppCompatActivity {
         return true;
     }
 
+    /**
+     * Validar el número de teléfono.
+     * @return Si el número de teléfono es válido
+     */
     private boolean validatePhone() {
         if (!countryCodePicker.isValidFullNumber()) {
             Toast.makeText(this, "Número de teléfono no válido según el país seleccionado", Toast.LENGTH_SHORT).show();

@@ -90,6 +90,9 @@ public class LogInActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * Comprueba si el usuario ya está autenticado y redirige a MainActivity
+     */
     private void checkIfUserIsAlreadyLoggedIn() {
         FirebaseUser user = firebaseAuth.getCurrentUser();
         if (user != null) {
@@ -114,6 +117,9 @@ public class LogInActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Configura Google Sign-In
+     */
     private void setupGoogleSignIn() {
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id)) // Usa el valor del archivo google-services.json
@@ -127,6 +133,9 @@ public class LogInActivity extends AppCompatActivity {
         signInButton.setOnClickListener(v -> signInWithGoogle());
     }
 
+    /**
+     * Inicia sesión con Google
+     */
     private void signInWithGoogle() {
         Intent signInIntent = googleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
@@ -248,6 +257,10 @@ public class LogInActivity extends AppCompatActivity {
         databaseHelper.registerLogin(userId, loginTime);
     }
 
+    /**
+     * Guarda los datos del usuario en Firestore y SQLite
+     * @param user Usuario autenticado
+     */
     private void saveUserData(FirebaseUser user) {
         String userId = user.getUid();
         String email = user.getEmail();
@@ -351,6 +364,9 @@ public class LogInActivity extends AppCompatActivity {
         callbackManager.onActivityResult(requestCode, resultCode, data); // Facebook login
     }
 
+    /**
+     * Maneja el resultado del inicio de sesión con Google
+     */
     private void handleGoogleSignInResult(Task<GoogleSignInAccount> completedTask) {
         try {
             GoogleSignInAccount account = completedTask.getResult(ApiException.class);

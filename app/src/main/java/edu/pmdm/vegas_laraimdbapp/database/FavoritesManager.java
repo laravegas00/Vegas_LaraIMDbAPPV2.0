@@ -163,6 +163,9 @@ public class FavoritesManager {
         return fBD.getUser(userId);
     }
 
+    /**
+     * Sincronizar las películas favoritas de Firestore con la base de datos local.
+     */
     public void syncFavoritesFromFirestore() {
         if (userId == null) {
             Log.e("FavoritesManager", "No hay usuario autenticado.");
@@ -200,6 +203,9 @@ public class FavoritesManager {
         });
     }
 
+    /**
+     * Escuchar cambios en las películas en tiempo real desde Firestore.
+     */
     public void listenForMovieUpdates() {
         db.collection("movies").addSnapshotListener((snapshots, e) -> {
             if (e != null) {

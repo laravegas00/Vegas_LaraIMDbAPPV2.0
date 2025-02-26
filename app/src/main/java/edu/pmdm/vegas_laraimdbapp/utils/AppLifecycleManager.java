@@ -10,13 +10,21 @@ import com.google.firebase.auth.FirebaseUser;
 
 import edu.pmdm.vegas_laraimdbapp.sync.UserSyncManager;
 
+/**
+ * Clase para manejar el ciclo de vida de la aplicación.
+ */
 public class AppLifecycleManager implements Application.ActivityLifecycleCallbacks {
 
+    // Variables para rastrear el estado de la app
     private static int activityCount = 0;
     private static boolean isAppInForeground = false;
     private final UserSyncManager userSyncManager;
     private final Context context;
 
+    /**
+     * Constructor
+     * @param context Contexto de la aplicación
+     */
     public AppLifecycleManager(Context context) {
         this.context = context;
         this.userSyncManager = new UserSyncManager(context);

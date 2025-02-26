@@ -20,13 +20,20 @@ import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 import edu.pmdm.vegas_laraimdbapp.utils.KeystoreManager;
 
+/**
+ * Clase para sincronizar los datos del usuario desde Firestore a SQLite y SharedPreferences.
+ */
 public class UserSyncManager {
     private final FirebaseFirestore db;
     private final Context context;
     private final FavoriteDatabase databaseHelper;
     private final KeystoreManager keystoreManager;
-    public static boolean isUserLoggingOut = false; // Flag para evitar múltiples logins/logouts
+    public static boolean isUserLoggingOut = false; // Evitar múltiples logins/logouts
 
+    /**
+     * Constructor
+     * @param context Contexto de la aplicación
+     */
     public UserSyncManager(Context context) {
         this.context = context;
         this.db = FirebaseFirestore.getInstance();
@@ -34,6 +41,10 @@ public class UserSyncManager {
         this.keystoreManager = new KeystoreManager(context);
     }
 
+    /**
+     * Registrar un login en Firestore y SQLite
+     * @param userId
+     */
     public void registerLogin(String userId) {
         if (userId == null) {
             return;
@@ -75,7 +86,10 @@ public class UserSyncManager {
         databaseHelper.registerLogin(userId, loginTime);
     }
 
-
+    /**
+     * Registrar un logout en Firestore y SQLite
+     * @param userId Id del usuario
+     */
     public void registerLogout(String userId) {
         if (userId == null) {
             Log.e("UserSyncManager", " No se puede registrar logout: userId es null.");
@@ -110,12 +124,17 @@ public class UserSyncManager {
         databaseHelper.registerLogout(userId, logoutTime);
     }
 
-
+    /**
+     * Obtener la fecha y hora actual
+     * @return Fecha y hora actual
+     */
     private String getCurrentDateTime() {
         return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
     }
 
-
+    /**
+     * Sincroniza las películas desde Firestore a SQLite
+     */
     public void syncMoviesFromFirestore() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -129,7 +148,6 @@ public class UserSyncManager {
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         FavoriteDatabase database = new FavoriteDatabase(context);
-                        //database.clearMoviesTable(); // Opcional: limpiar base de datos antes de sincronizar
 
                         for (QueryDocumentSnapshot document : task.getResult()) {
                             Movie movie = document.toObject(Movie.class);
@@ -142,8 +160,6 @@ public class UserSyncManager {
                     }
                 });
     }
-
-
 
     /**
      * Sincroniza los datos del usuario desde Firestore a SQLite y SharedPreferences.
@@ -184,6 +200,15 @@ public class UserSyncManager {
         }).addOnFailureListener(e -> Log.e("UserSyncManager", "Error al obtener datos del usuario en Firestore", e));
     }
 
+    /**
+     * Actualiza los datos del usuario en Firestore y SQLite.
+     * @param userId Id del usuario
+     * @param name Nombre del usuario
+     * @param email Email del usuario
+     * @param address Dirección
+     * @param phone Teléfono
+     * @param image Imagen de perfil
+     */
     public void addOrUpdateUser(String userId, String name, String email, String address, String phone, String image) {
         // Cifrar dirección y teléfono antes de almacenarlos
         String encryptedAddress = keystoreManager.encrypt(address);

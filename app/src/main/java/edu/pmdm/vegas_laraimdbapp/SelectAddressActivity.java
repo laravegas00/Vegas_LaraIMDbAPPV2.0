@@ -33,7 +33,11 @@ import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Actividad para seleccionar una dirección de mapa
+ */
 public class SelectAddressActivity extends AppCompatActivity implements OnMapReadyCallback {
+
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final int AUTOCOMPLETE_REQUEST_CODE = 2;
 
@@ -84,7 +88,9 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         });
     }
 
-    //solicitar los permisos
+    /**
+     * Verifica si el permiso de ubicación está concedido
+     */
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -93,7 +99,9 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         }
     }
 
-    // Manejar la respuesta de permisos
+    /**
+     * Maneja la respuesta de la solicitud de permisos de ubicación
+     */
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -106,7 +114,9 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         }
     }
 
-    //abre la interfaz de búsqueda de Google Places
+    /**
+     * Abre el buscador de direcciones de Google
+     */
     private void openPlaceSearch() {
         List<Place.Field> fields = Arrays.asList(
                 Place.Field.ID,        // ID del lugar
@@ -124,6 +134,9 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         }
     }
 
+    /**
+     * Maneja la respuesta del buscador de direcciones
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -158,6 +171,10 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         }
     }
 
+    /**
+     * Callback para el mapa
+     * @param googleMap Mapa de Google
+     */
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
@@ -169,6 +186,9 @@ public class SelectAddressActivity extends AppCompatActivity implements OnMapRea
         }
     }
 
+    /**
+     * Actualiza el mapa con la nueva ubicación seleccionada
+     */
     private void actualizarMapa() {
         if (mMap != null && selectedLatLng != null) {
             mMap.clear();

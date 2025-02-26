@@ -13,18 +13,23 @@ import javax.crypto.spec.GCMParameterSpec;
 
 import android.util.Base64;
 
+/**
+ * Clase para cifrar y descifrar datos utilizando el Keystore de Android.
+ */
 public class KeystoreManager {
+    // Constantes para el Keystore
     private static final String KEY_ALIAS = "MyAppKeyAlias";
     private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
-
     private Context context;
 
-    // Constructor que acepta el contexto
+    /**
+     * Constructor
+     * @param context Contexto de la aplicación
+     */
     public KeystoreManager(Context context) {
         this.context = context;
 
         try {
-            //obtiene una instancia
             KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
             keyStore.load(null);
 
@@ -43,7 +48,11 @@ public class KeystoreManager {
         }
     }
 
-    //metodo para cifrar
+    /**
+     * Cifrar un texto plano
+     * @param plainText Texto plano a cifrar
+     * @return Texto cifrado
+     */
     public String encrypt(String plainText) {
         try {
             // Obtiene la clave almacenada en el Keystore
@@ -51,26 +60,32 @@ public class KeystoreManager {
             keyStore.load(null);
             Key key = keyStore.getKey(KEY_ALIAS, null);
 
-            // Configura el cifrador con AES/GCM/NoPadding
+            // Configura el cifrador con AES/GCM/NoPadding y la clave
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, (SecretKey) key); // Inicia el cifrador en modo ENCRIPTAR
+            cipher.init(Cipher.ENCRYPT_MODE, (SecretKey) key);
 
-            byte[] iv = cipher.getIV(); // Obtiene el IV generado automáticamente
-            byte[] encrypted = cipher.doFinal(plainText.getBytes()); // Cifra el texto
+            // Cifra el texto plano
+            byte[] iv = cipher.getIV();
+            byte[] encrypted = cipher.doFinal(plainText.getBytes());
 
-            // Combina el IV y el texto cifrado en un solo array de bytes
+            // Combina el IV con el texto cifrado
             byte[] combined = new byte[iv.length + encrypted.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length); // Copia el IV al principio del array
-            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length); // Agrega el texto cifrado
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
 
-            return Base64.encodeToString(combined, Base64.DEFAULT); // Retorna el resultado en Base64
+            // Retorna el texto cifrado en Base64
+            return Base64.encodeToString(combined, Base64.DEFAULT);
         } catch (Exception e) {
-            e.printStackTrace(); // Captura errores si ocurren
+            e.printStackTrace();
         }
         return null;
     }
 
-    //metodo para descifrar
+    /**
+     * Descifrar un texto cifrado
+     * @param encryptedText Texto cifrado a descifrar
+     * @return Texto descifrado
+     */
     public String decrypt(String encryptedText) {
         try {
             // Obtiene la clave almacenada en el Keystore
@@ -78,22 +93,22 @@ public class KeystoreManager {
             keyStore.load(null);
             Key key = keyStore.getKey(KEY_ALIAS, null);
 
-            // Decodifica el texto cifrado de Base64 a un array de bytes
+            // Decodifica el texto cifrado
             byte[] combined = Base64.decode(encryptedText, Base64.DEFAULT);
-            byte[] iv = new byte[12]; // El IV tiene 12 bytes en GCM
-            byte[] encrypted = new byte[combined.length - 12]; // El resto es el texto cifrado
+            byte[] iv = new byte[12];
+            byte[] encrypted = new byte[combined.length - 12];
 
-            // Separa el IV del texto cifrado
+            // Copia el IV y el texto cifrado
             System.arraycopy(combined, 0, iv, 0, iv.length);
             System.arraycopy(combined, iv.length, encrypted, 0, encrypted.length);
 
-            // Configura el cifrador con AES/GCM/NoPadding y el IV obtenido
+            // Configura el cifrador con AES/GCM/NoPadding y la clave
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, (SecretKey) key, new GCMParameterSpec(128, iv));
 
             return new String(cipher.doFinal(encrypted)); // Retorna el texto descifrado
         } catch (Exception e) {
-            e.printStackTrace(); // Captura errores si ocurren
+            e.printStackTrace();
         }
         return null;
     }

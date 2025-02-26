@@ -122,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     /**
-     * Método para cerrar la sesión del usuario.
+     * Método para actualizar los datos del usuario en el Navigation Drawer
      */
     private void updateNavigationHeader() {
         NavigationView navigationView = findViewById(R.id.nav_view);
@@ -178,7 +178,9 @@ public class MainActivity extends AppCompatActivity {
         Log.d("MainActivity", "Datos de usuario actualizados en Navigation Drawer.");
     }
 
-
+    /**
+     * Cierra la sesión del usuario y redirige a LogInActivity
+     */
     private void cerrarSesion() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
@@ -213,6 +215,10 @@ public class MainActivity extends AppCompatActivity {
         finish();
     }
 
+    /**
+     * Carga la imagen de perfil del usuario
+     * @param imageUrl URL de la imagen de perfil
+     */
     private void loadUserProfileImage(String imageUrl) {
         if (imageUrl == null || imageUrl.isEmpty()) {
             //Establecer una imagen por defecto si la URL es nula
@@ -228,7 +234,10 @@ public class MainActivity extends AppCompatActivity {
                 .into(imageView);
     }
 
-
+    /**
+     * Obtiene la fecha y hora actual
+     * @return Fecha y hora actual en formato String
+     */
     private String getCurrentDateTime() {
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         return sdf.format(new java.util.Date());
@@ -246,7 +255,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    //maneja la selecion de opciones en el menu
+    /**
+     * Maneja la selección de un elemento del menú
+     * @param item Elemento del menú seleccionado
+     * @return True si se ha manejado la selección, false en caso contrario
+     */
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
