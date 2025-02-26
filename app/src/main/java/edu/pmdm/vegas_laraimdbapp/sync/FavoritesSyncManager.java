@@ -1,10 +1,13 @@
 package edu.pmdm.vegas_laraimdbapp.sync;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
@@ -12,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 
@@ -24,8 +28,13 @@ public class FavoritesSyncManager {
     public FavoritesSyncManager(Context context) {
         this.favoritesManager = FavoritesManager.getInstance(context);
         this.db = FirebaseFirestore.getInstance();
-        this.userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-    }
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            userId = user.getUid();
+        } else {
+            Log.e(TAG, "El usuario no está autenticado. No se puede sincronizar favoritos.");
+            userId = null;
+        }    }
 
     private CollectionReference getFavoritesCollection() {
         return db.collection("favorites").document(userId).collection("movies");
@@ -47,47 +56,39 @@ public class FavoritesSyncManager {
     }
 
     public void syncLocalWithFirestore(Context context) {
-        CollectionReference favoritesRef = getFavoritesCollection();
-
-        List<Movie> localFavorites = favoritesManager.getFavoriteMovies(userId);
-        List<String> localMovieIds = new ArrayList<>();
-        for (Movie movie : localFavorites) {
-            localMovieIds.add(movie.getId());
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Log.e(TAG, "Sincronizacion cancelada. No hay usuario autenticado.");
+            return;
         }
 
-        List<Movie> firestoreMovies = new ArrayList<>();
-        favoritesRef.get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                List<String> remoteMovieIds = new ArrayList<>();
-                for (QueryDocumentSnapshot document : task.getResult()) {
-                    String id = document.getString("movieId");
-                    String title = document.getString("title");
-                    String posterUrl = document.getString("imageUrl");
-                    String releaseDate = document.getString("releaseDate");
-                    String overview = document.getString("plot");
-                    double rating = document.getDouble("rating");
-                    Movie movie = new Movie(id, posterUrl, title, overview, rating, releaseDate);
-                    firestoreMovies.add(movie);
-                    remoteMovieIds.add(id);
-                }
+        SharedPreferences sharedPreferences = context.getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String userId = sharedPreferences.getString("userId", null);
 
-                for (Movie movie : localFavorites) {
-                    if (!remoteMovieIds.contains(movie.getId())) {
-                        addFavoriteToFirestore(movie);
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        // Obtener las películas desde Firestore
+        db.collection("favorites").document(userId).collection("movies")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (queryDocumentSnapshots.isEmpty()) {
+                        Log.d(TAG, "No hay favoritos almacenados en Firestore.");
+                        return;
                     }
-                }
 
-                for (Movie movie : firestoreMovies) {
-                    if (!localMovieIds.contains(movie.getId())) {
-                        favoritesManager.addFavorite(movie, userId);
+                    FavoriteDatabase database = new FavoriteDatabase(context);
+                    //database.clearFavorites(userId); // Eliminar los favoritos locales antes de sincronizar
+
+                    for (DocumentSnapshot document : queryDocumentSnapshots) {
+                        Movie movie = document.toObject(Movie.class);
+                        if (movie != null) {
+                            database.addFavorite(movie, userId);
+                        }
                     }
-                }
 
-                Log.d(TAG, "Sincronización completada entre SQLite y Firestore.");
-            } else {
-                Log.e(TAG, "Error al obtener películas de Firestore", task.getException());
-            }
-        });
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Error al obtener favoritos de Firestore", e));
     }
+
 
 }

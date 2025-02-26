@@ -24,6 +24,9 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +35,7 @@ import edu.pmdm.vegas_laraimdbapp.MovieDetailsActivity;
 import edu.pmdm.vegas_laraimdbapp.R;
 import edu.pmdm.vegas_laraimdbapp.adapter.MovieAdapter;
 import edu.pmdm.vegas_laraimdbapp.bluetooth.BluetoothSimulator;
+import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
 import edu.pmdm.vegas_laraimdbapp.models.Movie;
 
@@ -48,6 +52,7 @@ public class GalleryFragment extends Fragment {
     private FavoritesManager favoritesManager;
     private String userId;
     private List<Movie> favoriteMovies = new ArrayList<>();
+    private FavoriteDatabase database;
 
     @SuppressLint("NotifyDataSetChanged")
     @Override
@@ -70,29 +75,29 @@ public class GalleryFragment extends Fragment {
                     }
                 }
         );
+        favoritesManager = FavoritesManager.getInstance(getContext());
 
-        // Obtener el ID del usuario actual
-        SharedPreferences sharedPreferences = requireContext().getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
-        userId = sharedPreferences.getString("USER_ID", null);
-
-        if (userId == null) {
+        //  Obtener el usuario autenticado de Firebase
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            userId = user.getUid();
+        } else {
+            // Si el usuario no está autenticado, mostrar mensaje y redirigir a login
             Toast.makeText(getContext(), "Usuario no autenticado. Por favor, inicia sesión.", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(getContext(), LogInActivity.class);
             startActivity(intent);
             return root;
         }
 
-        Log.d("GalleryFragment", "Obtenido userId: " + userId);
+        database = new FavoriteDatabase(getContext());
 
-        // Cargar películas favoritas desde la base de datos
-        favoritesManager = FavoritesManager.getInstance(getContext());
-        favoriteMovies = favoritesManager.getFavoriteMovies(userId);
+
 
         movieAdapter = new MovieAdapter(getContext(), favoriteMovies, this::onMovieClick);
         movieAdapter.setOnMovieLongClickListener(this::onMovieLongClick);
         recyclerView.setAdapter(movieAdapter);
         movieAdapter.notifyDataSetChanged();
-
+        loadMoviesFromDatabase(); //  Cargar películas desde SQLite
         Button shareButton = root.findViewById(R.id.btnShare);
         shareButton.setOnClickListener(v -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
@@ -106,11 +111,20 @@ public class GalleryFragment extends Fragment {
         return root;
     }
 
+    private void loadMoviesFromDatabase() {
+        favoriteMovies.clear();
+        favoriteMovies.addAll(database.getAllFavorites(userId)); // Recuperar películas de SQLite
+        movieAdapter.notifyDataSetChanged();
+    }
+
     @Override
     public void onResume() {
         super.onResume();
-        favoriteMovies = favoritesManager.getFavoriteMovies(userId);
-        movieAdapter.updateMovies(favoriteMovies);
+        if (userId != null) {
+            favoritesManager.syncFavoritesFromFirestore();  // Sincronizar favoritos con Firestore
+            favoriteMovies = favoritesManager.getFavoriteMovies(userId);
+            movieAdapter.updateMovies(favoriteMovies);
+        }
     }
 
     /**

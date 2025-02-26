@@ -1,6 +1,5 @@
 package edu.pmdm.vegas_laraimdbapp;
 
-import static android.content.ContentValues.TAG;
 
 import android.content.Context;
 import android.content.Intent;
@@ -37,11 +36,17 @@ import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.FacebookAuthProvider;
+import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.Arrays;
-import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
+import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
+import edu.pmdm.vegas_laraimdbapp.sync.UserSyncManager;
+import edu.pmdm.vegas_laraimdbapp.utils.KeystoreManager;
 
 /**
  * Actividad de inicio de sesión con Google, Facebook y Email.
@@ -49,9 +54,12 @@ import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
 public class LogInActivity extends AppCompatActivity {
 
     private FirebaseAuth firebaseAuth;
+    private FirebaseFirestore db;
     private GoogleSignInClient googleSignInClient;
     private CallbackManager callbackManager;
     private FavoriteDatabase databaseHelper;
+    private UserSyncManager userSyncManager;
+    private FavoritesManager favoritesManager;
 
     private EditText editTextEmail, editTextPassword;
     private Button buttonLogin, buttonRegister;
@@ -65,20 +73,29 @@ public class LogInActivity extends AppCompatActivity {
         setContentView(R.layout.activity_log_in);
 
         // Inicializar Firebase y la BD local
+        favoritesManager = FavoritesManager.getInstance(this);
         firebaseAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
         databaseHelper = new FavoriteDatabase(this);
+        userSyncManager = new UserSyncManager(this);
 
         initializeUI();
         setupGoogleSignIn();
         setupFacebookSignIn();
 
-        // Verificar si el usuario ya está autenticado
-        if (firebaseAuth.getCurrentUser() != null) {
-            registerLogin(firebaseAuth.getCurrentUser());
-        }
+        checkIfUserIsAlreadyLoggedIn();
 
         buttonLogin.setOnClickListener(v -> loginUser());
         buttonRegister.setOnClickListener(v -> registerUser());
+
+    }
+
+    private void checkIfUserIsAlreadyLoggedIn() {
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        if (user != null) {
+            Log.d("LogInActivity", "Usuario ya autenticado. No se ejecutará nuevo login.");
+            redirectToMainActivity(user);
+        }
     }
 
     /**
@@ -90,10 +107,6 @@ public class LogInActivity extends AppCompatActivity {
         buttonLogin = findViewById(R.id.buttonLogin);
         buttonRegister = findViewById(R.id.buttonRegister);
 
-        SignInButton googleSignInButton = findViewById(R.id.sign_in_button);
-        googleSignInButton.setSize(SignInButton.SIZE_STANDARD);
-        setGoogleSignInButtonText(googleSignInButton, "Sign in with Google");
-
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -101,21 +114,22 @@ public class LogInActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Configura Google Sign-In
-     */
     private void setupGoogleSignIn() {
-        googleSignInClient = GoogleSignIn.getClient(this,
-                new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestEmail()
-                        .requestProfile()
-                        .build()
-        );
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id)) // Usa el valor del archivo google-services.json
+                .requestEmail()
+                .build();
 
-        findViewById(R.id.sign_in_button).setOnClickListener(v -> {
-            Intent signInIntent = googleSignInClient.getSignInIntent();
-            startActivityForResult(signInIntent, RC_SIGN_IN);
-        });
+        googleSignInClient = GoogleSignIn.getClient(this, gso);
+
+        SignInButton signInButton = findViewById(R.id.sign_in_button);
+        setGoogleSignInButtonText(signInButton, "Sign in with Google");
+        signInButton.setOnClickListener(v -> signInWithGoogle());
+    }
+
+    private void signInWithGoogle() {
+        Intent signInIntent = googleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
     }
 
     /**
@@ -151,9 +165,12 @@ public class LogInActivity extends AppCompatActivity {
         firebaseAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        redirectToMainActivity(firebaseAuth.getCurrentUser());
-                    } else {
-                        Toast.makeText(this, "Error en autenticación con Facebook", Toast.LENGTH_SHORT).show();
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        if (user != null) {
+                            saveUserData(user);
+                            registerLogin(user.getUid());
+                            redirectToMainActivity(user);
+                        }
                     }
                 });
     }
@@ -164,22 +181,19 @@ public class LogInActivity extends AppCompatActivity {
     private void loginUser() {
         String email = editTextEmail.getText().toString().trim();
         String password = editTextPassword.getText().toString().trim();
-
-        if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
-            Toast.makeText(this, "Introduce email y contraseña", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
+        if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) return;
         firebaseAuth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener(task -> {
+                .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        registerLogin(firebaseAuth.getCurrentUser());
-                    } else {
-                        Toast.makeText(this, "Error al iniciar sesión: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        if (user != null) {
+                            saveUserData(user);
+                            registerLogin(user.getUid());
+                            redirectToMainActivity(user);
+                        }
                     }
                 });
     }
-
     /**
      * Registra un usuario en Firebase con email y contraseña
      */
@@ -198,11 +212,14 @@ public class LogInActivity extends AppCompatActivity {
         }
 
         firebaseAuth.createUserWithEmailAndPassword(email, password)
-                .addOnCompleteListener(task -> {
+                .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        registerLogin(firebaseAuth.getCurrentUser());
-                    } else {
-                        Toast.makeText(this, "Error al registrarse: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        if (user != null) {
+                            saveUserData(user);
+                            registerLogin(user.getUid());
+                            redirectToMainActivity(user);
+                        }
                     }
                 });
     }
@@ -210,38 +227,64 @@ public class LogInActivity extends AppCompatActivity {
     /**
      * Registra el login en la base de datos y guarda en SharedPreferences
      */
-    private void registerLogin(FirebaseUser user) {
-        if (user != null) {
-            String userId = user.getUid();
-            String name = user.getDisplayName();
-            String email = user.getEmail();
-            String loginTime = getCurrentDateTime();
+    private void registerLogin(String userId) {
+        String loginTime = getCurrentDateTime();
 
-            if (!databaseHelper.userExists(userId)) {
-                databaseHelper.addUser(userId, name, email, loginTime, null);
-            } else {
-                databaseHelper.registerLogin(userId, loginTime);
-            }
+        // Guardar en Firestore
+        Map<String, Object> logEntry = new HashMap<>();
+        logEntry.put("login_time", loginTime);
+        logEntry.put("logout_time", null);
 
-            saveUserData(email);
-            redirectToMainActivity(user);
-        }
-    }
+        db.collection("users").document(userId)
+                .collection("activity_log")
+                .add(logEntry);
 
-    /**
-     * Guarda el correo del usuario en SharedPreferences.
-     */
-    private void saveUserData(String email) {
-        SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString("USER_EMAIL", email);
-        editor.putString("USER_ID", generateUserId(email));
+        // Guardar en SharedPreferences
+        SharedPreferences.Editor editor = getSharedPreferences("UserPrefs", Context.MODE_PRIVATE).edit();
+        editor.putString("last_login", loginTime);
         editor.apply();
+
+        // Guardar en SQLite
+        databaseHelper.registerLogin(userId, loginTime);
     }
 
-    private String generateUserId(String email) {
-        return UUID.nameUUIDFromBytes(email.getBytes()).toString();
+    private void saveUserData(FirebaseUser user) {
+        String userId = user.getUid();
+        String email = user.getEmail();
+        String name = user.getDisplayName();
+        String address = "Sin dirección"; // Se puede actualizar en el perfil
+        String phone = "Sin teléfono"; // Se puede actualizar en el perfil
+
+        KeystoreManager keystoreManager = new KeystoreManager(this);
+        String encryptedAddress = keystoreManager.encrypt(address);
+        String encryptedPhone = keystoreManager.encrypt(phone);
+
+        // Guardar en Firestore
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("userId", userId);
+        userData.put("email", email);
+        userData.put("name", name);
+        userData.put("address", encryptedAddress);
+        userData.put("phone", encryptedPhone);
+
+        db.collection("users").document(userId)
+                .set(userData)
+                .addOnSuccessListener(aVoid -> Log.d("LogInActivity", "Usuario guardado en Firestore"))
+                .addOnFailureListener(e -> Log.e("LogInActivity", "Error al guardar usuario en Firestore", e));
+
+        // Guardar en SharedPreferences
+        SharedPreferences.Editor editor = getSharedPreferences("UserPrefs", Context.MODE_PRIVATE).edit();
+        editor.putString("userId", userId);
+        editor.putString("email", email);
+        editor.putString("name", name);
+        editor.putString("address", address);
+        editor.putString("phone", phone);
+        editor.apply();
+
+        // Guardar en SQLite
+        databaseHelper.addUser(userId, name, email, address, phone, null, null);
     }
+
 
     /**
      * Obtiene la fecha y hora actual
@@ -254,12 +297,35 @@ public class LogInActivity extends AppCompatActivity {
      * Redirige a MainActivity tras un inicio de sesión exitoso.
      */
     private void redirectToMainActivity(FirebaseUser user) {
+        if (user == null) {
+            Log.e("LogInActivity", "Usuario es null, no se puede redirigir.");
+            return;
+        }
+
+        Log.d("LogInActivity", "Redirigiendo a MainActivity con usuario: " + user.getUid());
+
+        userSyncManager.registerLogin(user.getUid());
+
+        //Inicializar FavoritesManager si es null
+        if (favoritesManager == null) {
+            favoritesManager = FavoritesManager.getInstance(this);
+        }
+
+        // Asegurar que favoritesManager no sea null antes de llamar a listenForMovieUpdates()
+        if (favoritesManager != null) {
+            favoritesManager.listenForMovieUpdates();
+        } else {
+            Log.e("LogInActivity", "FavoritesManager es null, no se puede escuchar actualizaciones.");
+        }
+
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("name", user.getDisplayName());
         intent.putExtra("email", user.getEmail());
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
     }
+
 
     /**
      * Personaliza el texto del botón de Google Sign-In.
@@ -273,4 +339,41 @@ public class LogInActivity extends AppCompatActivity {
             }
         }
     }
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            handleGoogleSignInResult(task);
+        }
+        callbackManager.onActivityResult(requestCode, resultCode, data); // Facebook login
+    }
+
+    private void handleGoogleSignInResult(Task<GoogleSignInAccount> completedTask) {
+        try {
+            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+            if (account != null) {
+                AuthCredential credential = GoogleAuthProvider.getCredential(account.getIdToken(), null);
+                firebaseAuth.signInWithCredential(credential)
+                        .addOnCompleteListener(this, task -> {
+                            if (task.isSuccessful()) {
+                                FirebaseUser user = firebaseAuth.getCurrentUser();
+                                if (user != null) {
+                                    saveUserData(user);
+                                    registerLogin(user.getUid());
+                                    redirectToMainActivity(user);
+                                }
+                            } else {
+                                Toast.makeText(this, "Autenticación fallida", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+            }
+        } catch (ApiException e) {
+            Toast.makeText(this, "Error en inicio de sesión", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
 }

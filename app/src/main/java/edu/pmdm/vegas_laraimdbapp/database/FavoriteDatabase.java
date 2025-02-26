@@ -23,7 +23,7 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
 
     //Constantes para la base de datos
     private static final String DATABASE_NAME = "favoritesmovies.db";
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     //Constantes para la tabla de películas favoritas
     private static final String TABLE_FAVORITES = "favorites";
@@ -44,6 +44,10 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
     public static final String COLUMN_EMAIL = "email";
     public static final String COLUMN_LAST_LOGIN = "last_login";
     public static final String COLUMN_LAST_LOGOUT = "last_logout";
+    public static final String COLUMN_ADDRESS = "address";
+    public static final String COLUMN_PHONE = "phone";
+    public static final String COLUMN_IMAGE = "image";
+
 
     /**
      * Constructor de la clase
@@ -71,13 +75,15 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
                 "PRIMARY KEY (" + COLUMN_ID + ", " + COLUMN_USERID + "))";
         db.execSQL(createTable);
 
-        // Crear tabla de usuarios
         String createUsersTable = "CREATE TABLE " + TABLE_USERS + " (" +
                 COLUMN_USER_ID + " TEXT PRIMARY KEY, " +
                 COLUMN_NAME + " TEXT, " +
                 COLUMN_EMAIL + " TEXT, " +
                 COLUMN_LAST_LOGIN + " TEXT, " +
-                COLUMN_LAST_LOGOUT + " TEXT" +
+                COLUMN_LAST_LOGOUT + " TEXT, " +
+                COLUMN_ADDRESS + " TEXT, " +  // Nuevo campo
+                COLUMN_PHONE + " TEXT, " +    // Nuevo campo
+                COLUMN_IMAGE + " TEXT " +     // Nuevo campo
                 ");";
         db.execSQL(createUsersTable);
 
@@ -91,15 +97,11 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
      */
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 5) {
-            String createUsersTable = "CREATE TABLE IF NOT EXISTS " + TABLE_USERS + " (" +
-                    COLUMN_USER_ID + " TEXT PRIMARY KEY, " +
-                    COLUMN_NAME + " TEXT, " +
-                    COLUMN_EMAIL + " TEXT, " +
-                    COLUMN_LAST_LOGIN + " TEXT, " +
-                    COLUMN_LAST_LOGOUT + " TEXT" +
-                    ");";
-            db.execSQL(createUsersTable);
+        if (oldVersion < 6) {
+            db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_ADDRESS + " TEXT;");
+            db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_PHONE + " TEXT;");
+            db.execSQL("ALTER TABLE " + TABLE_USERS + " ADD COLUMN " + COLUMN_IMAGE + " TEXT;");
+
         }
     }
 
@@ -215,37 +217,40 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         }
     }
 
-    public void addUser(String userId, String name, String email, String lastLogin, String lastLogout) {
+    public void addUser(String userId, String name, String email, String lastLogin, String lastLogout, String address, String phone) {
         SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(COLUMN_USER_ID, userId);
-        values.put(COLUMN_NAME, name);
-        values.put(COLUMN_EMAIL, email);
-        values.put(COLUMN_LAST_LOGIN, lastLogin);
-        values.put(COLUMN_LAST_LOGOUT, lastLogout);
-
         try {
-            long result = db.insert(TABLE_USERS, null, values);
-            if (result == -1) {
-                Log.e("FavoriteDatabase", "Error al agregar el usuario: " + userId);
-            } else {
-                Log.d("FavoriteDatabase", "Usuario agregado con éxito: " + userId);
-            }
+            ContentValues values = new ContentValues();
+            values.put("userId", userId);
+            values.put("name", name != null ? name : "Usuario Desconocido");
+            values.put("email", email != null ? email : "Sin Email");
+            values.put("last_login", lastLogin != null ? lastLogin : "Desconocido");
+            values.put("last_logout", lastLogout != null ? lastLogout : "Desconocido");
+            values.put("address", address != null ? address : "Sin Dirección");
+            values.put("phone", phone != null ? phone : "Sin Teléfono");
+
+            db.insertWithOnConflict("users", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            Log.d("FavoriteDatabase", "Usuario agregado o actualizado: " + userId);
         } catch (Exception e) {
-            Log.e("FavoriteDatabase", "Error al insertar usuario: " + e.getMessage());
+            Log.e("FavoriteDatabase", "Error al agregar el usuario: " + userId, e);
+        } finally {
+            db.close();
         }
     }
 
-    public void updateUser(String userId, String name, String email, String lastLogin, String lastLogout) {
+
+    public void updateUser(String userId, String name, String email, String lastLogin, String lastLogout, String address, String phone, String image) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         if (name != null) values.put(COLUMN_NAME, name);
         if (email != null) values.put(COLUMN_EMAIL, email);
         if (lastLogin != null) values.put(COLUMN_LAST_LOGIN, lastLogin);
         if (lastLogout != null) values.put(COLUMN_LAST_LOGOUT, lastLogout);
+        if (address != null) values.put(COLUMN_ADDRESS, address); // Nuevo campo
+        if (phone != null) values.put(COLUMN_PHONE, phone);       // Nuevo campo
+        if (image != null) values.put(COLUMN_IMAGE, image);       // Nuevo campo
 
-        db.update(TABLE_USERS, values, COLUMN_USER_ID + "=?", new String[]{userId});
-    }
+        db.update(TABLE_USERS, values, COLUMN_USER_ID + "=?", new String[]{userId});    }
 
     public boolean userExists(String userId) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -261,20 +266,48 @@ public class FavoriteDatabase extends SQLiteOpenHelper {
         return exists;
     }
 
+    /**
+     * Obtener datos de un usuario
+     */
+    public Map<String, String> getUser(String userId) {
+        Map<String, String> userData = new HashMap<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        String selection = COLUMN_USER_ID + " = ?";
+        String[] selectionArgs = {userId};
+
+        Cursor cursor = db.query(TABLE_USERS, null, selection, selectionArgs, null, null, null);
+
+        if (cursor != null && cursor.moveToFirst()) {
+            userData.put(COLUMN_USER_ID, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_USER_ID)));
+            userData.put(COLUMN_NAME, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME)));
+            userData.put(COLUMN_EMAIL, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_EMAIL)));
+            userData.put(COLUMN_LAST_LOGIN, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_LAST_LOGIN)));
+            userData.put(COLUMN_LAST_LOGOUT, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_LAST_LOGOUT)));
+            userData.put(COLUMN_ADDRESS, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ADDRESS)));
+            userData.put(COLUMN_PHONE, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_PHONE)));
+            userData.put(COLUMN_IMAGE, cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_IMAGE)));
+        }
+
+        if (cursor != null) cursor.close();
+        return userData;
+    }
+
     public void registerLogin(String userId, String loginTime) {
         if (userExists(userId)) {
-            updateUser(userId, null, null, loginTime, null);
+            updateUser(userId, null, null, loginTime, null, null, null, null);
         } else {
-            addUser(userId, null, null, loginTime, null);
+            addUser(userId, null, null, loginTime, null, null, null);
         }
     }
 
     public void registerLogout(String userId, String logoutTime) {
         if (userExists(userId)) {
-            updateUser(userId, null, null, null, logoutTime);
+            updateUser(userId, null, null, null, logoutTime, null, null, null);
         } else {
-            addUser(userId, null, null, null, logoutTime);
+            addUser(userId, null, null, null, logoutTime, null, null);
         }
     }
+
+
 
 }

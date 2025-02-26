@@ -6,6 +6,7 @@ public class User {
     private String email;
     private String lastLogin;
     private String lastLogout;
+    private String profileImage;
 
     public User(String id, String name, String email, String lastLogin, String lastLogout) {
         this.id = id;
@@ -13,9 +14,16 @@ public class User {
         this.email = email;
         this.lastLogin = lastLogin;
         this.lastLogout = lastLogout;
+        this.profileImage = profileImage;
     }
 
     // Getters y Setters
+
+
+    public String getProfileImage() {
+        return profileImage;
+    }
+
     public String getId() {
         return id;
     }
@@ -46,4 +54,5 @@ public class User {
     public void setLastLogout(String lastLogout) {
         this.lastLogout = lastLogout;
     }
+
 }

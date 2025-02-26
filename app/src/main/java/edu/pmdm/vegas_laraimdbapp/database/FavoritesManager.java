@@ -2,16 +2,17 @@ package edu.pmdm.vegas_laraimdbapp.database;
 
 import static android.content.ContentValues.TAG;
 
-import android.content.ContentValues;
 import android.content.Context;
-import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,9 @@ import edu.pmdm.vegas_laraimdbapp.models.Movie;
  * Clase para gestionar las películas favoritas.
  */
 public class FavoritesManager {
+
+    private static final String DEFAULT_IMAGE = "android.resource://edu.pmdm.vegas_laraimdbapp/drawable/ic_android";
+    private Context context;
 
     // Instancia única de la clase
     private static FavoritesManager instance;
@@ -37,7 +41,10 @@ public class FavoritesManager {
     private FavoritesManager(Context context) {
         fBD = new FavoriteDatabase(context);
         db = FirebaseFirestore.getInstance();
-        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null) {
+            userId = auth.getCurrentUser().getUid();
+        }
     }
 
     /**
@@ -60,19 +67,18 @@ public class FavoritesManager {
      */
     public boolean addFavorite(Movie movie, String userId) {
 
+        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+
         //Comprobar que la pelicula tenga ID
         if (movie.getId() == null || movie.getId().isEmpty()) {
-            Log.e("FavoritesManager", "El ID de la película es nulo o vacío.");
             return false;
         }
 
         // Verifica el usuario antes de agregar
         if (fBD.movieExists(movie.getId(), userId)) {
-            Log.i("FavoritesManager", "Película ya en favoritos de usuario: " + userId);
             return true;
         } else {
             fBD.addFavorite(movie, userId);
-            Log.i("FavoritesManager", "Película añadida a favoritos de usuario: " + userId);
 
             // Guardar en Firestore
             CollectionReference favoritesRef = db.collection("favorites").document(userId).collection("movies");
@@ -99,6 +105,10 @@ public class FavoritesManager {
      * @param userId ID del usuario
      */
     public void removeFavorite(Movie movie, String userId) {
+        if (userId == null || movie.getId() == null) {
+            return;
+        }
+
         fBD.removeFavorite(movie.getId(), userId);
 
         // Eliminar de Firestore
@@ -119,20 +129,96 @@ public class FavoritesManager {
         return fBD.getAllFavorites(userId); // Obtener las películas favoritas del usuario
     }
 
+
     public void registerLogin(String userId, String loginTime) {
-        SQLiteDatabase db = fBD.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(FavoriteDatabase.COLUMN_LAST_LOGIN, loginTime);
-        db.update(FavoriteDatabase.TABLE_USERS, values, FavoriteDatabase.COLUMN_USER_ID + "=?", new String[]{userId});
-        db.close();
+        fBD.registerLogin(userId, loginTime);
     }
 
     public void registerLogout(String userId, String logoutTime) {
-        SQLiteDatabase db = fBD.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(FavoriteDatabase.COLUMN_LAST_LOGOUT, logoutTime);
-        db.update(FavoriteDatabase.TABLE_USERS, values, FavoriteDatabase.COLUMN_USER_ID + "=?", new String[]{userId});
-        db.close();
+        fBD.registerLogout(userId, logoutTime);
     }
+
+    /**
+     * Agregar o actualizar información del usuario en la base de datos local.
+     */
+    public void addOrUpdateUser(String userId, String name, String email, String loginTime, String logoutTime, String address, String phone, String image) {
+        Map<String, String> userData = fBD.getUser(userId);
+
+        // Usamos valores existentes si no se pasan nuevos
+        String finalName = name != null ? name : userData.getOrDefault("name", "Usuario");
+        String finalEmail = email != null ? email : userData.getOrDefault("email", "Sin Email");
+        String finalLoginTime = loginTime != null ? loginTime : userData.get("last_login");
+        String finalLogoutTime = logoutTime != null ? logoutTime : userData.get("last_logout");
+        String finalAddress = address != null ? address : userData.getOrDefault("address", "Sin Dirección");
+        String finalPhone = phone != null ? phone : userData.getOrDefault("phone", "Sin Teléfono");
+        String finalImage = image != null ? image : userData.getOrDefault("image", DEFAULT_IMAGE);
+
+        fBD.updateUser(userId, finalName, finalEmail, finalLoginTime, finalLogoutTime, finalAddress, finalPhone, finalImage);
+    }
+
+    /**
+     * Obtener los detalles del usuario desde la base de datos local.
+     */
+    public Map<String, String> getUserDetails(String userId) {
+        return fBD.getUser(userId);
+    }
+
+    public void syncFavoritesFromFirestore() {
+        if (userId == null) {
+            Log.e("FavoritesManager", "No hay usuario autenticado.");
+            return;
+        }
+
+        CollectionReference favoritesRef = db.collection("favorites").document(userId).collection("movies");
+
+        favoritesRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && task.getResult() != null) {
+                List<Movie> moviesFromFirestore = new ArrayList<>();
+                for (QueryDocumentSnapshot document : task.getResult()) {
+                    Movie movie = new Movie();
+                    movie.setId(document.getString("movieId"));
+                    movie.setTitle(document.getString("title"));
+                    movie.setImage(document.getString("imageUrl"));
+                    movie.setReleaseDate(document.getString("releaseDate"));
+                    movie.setPlot(document.getString("plot"));
+                    movie.setRating(document.getDouble("rating"));
+
+                    moviesFromFirestore.add(movie);
+                }
+
+                // Guardar en SQLite
+                for (Movie movie : moviesFromFirestore) {
+                    if (!fBD.movieExists(movie.getId(), userId)) {
+                        fBD.addFavorite(movie, userId);
+                    }
+                }
+
+                Log.d(TAG, "Sincronización de favoritos completada con éxito.");
+            } else {
+                Log.e(TAG, "Error al recuperar favoritos de Firestore", task.getException());
+            }
+        });
+    }
+
+    public void listenForMovieUpdates() {
+        db.collection("movies").addSnapshotListener((snapshots, e) -> {
+            if (e != null) {
+                Log.e("FavoritesManager", "Error al escuchar cambios en películas", e);
+                return;
+            }
+
+            if (snapshots != null) {
+                FavoriteDatabase database = new FavoriteDatabase(context);
+
+                for (DocumentSnapshot document : snapshots.getDocuments()) {
+                    Movie movie = document.toObject(Movie.class);
+                    database.addFavorite(movie, userId); // Guardar en SQLite
+                }
+
+                Log.d("FavoritesManager", "Películas actualizadas en tiempo real desde Firestore.");
+            }
+        });
+    }
+
 
 }

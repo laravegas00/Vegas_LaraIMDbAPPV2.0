@@ -128,17 +128,14 @@ public class MovieListActivity extends AppCompatActivity {
         String userId = prefs.getString("USER_ID", null);
 
         if (userId == null) {
-            Log.e("MovieListActivity", "No se encontró un ID de usuario válido en SharedPreferences");
             Toast.makeText(this, "Error: No se ha encontrado un usuario válido", Toast.LENGTH_SHORT).show();
             return;
         }
 
         FavoritesManager favoritesManager = FavoritesManager.getInstance(this);
         if (favoritesManager.addFavorite(movie, userId)) {
-            Log.i("MovieListActivity", "Película ya estaba en favoritos para usuario: " + userId);
             Toast.makeText(this, "Película ya estaba en favoritos", Toast.LENGTH_SHORT).show();
         } else {
-            Log.i("MovieListActivity", "Película agregada a favoritos para usuario: " + userId);
             Toast.makeText(this, "Película agregada a favoritos", Toast.LENGTH_SHORT).show();
         }
     }

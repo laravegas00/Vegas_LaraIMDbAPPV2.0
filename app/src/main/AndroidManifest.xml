@@ -5,6 +5,9 @@
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -15,9 +18,13 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
 
     <application
         android:allowBackup="true"
@@ -30,6 +37,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Vegas_LaraIMDbAPP"
         tools:targetApi="31">
+        <activity
+            android:name=".SelectAddressActivity"
+            android:exported="false" />
+        <activity
+            android:name=".EditUserActivity"
+            android:exported="false" />
         <activity
             android:name=".MovieListActivity"
             android:exported="false" />
@@ -51,24 +64,25 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Vegas_LaraIMDbAPP.NoActionBar" />
 
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="edu.pmdm.vegas_laraimdbapp.provider"
-            android:grantUriPermissions="true"
-            android:exported="false">
+            android:exported="false"
+            android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
 
-
-        <meta-data android:name="com.facebook.sdk.ApplicationId"
-            android:value="@string/facebook_app_id"/>
-        <meta-data android:name="com.facebook.sdk.ClientToken"
-            android:value="@string/facebook_client_token"/>
-
-
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token" />
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyAER7D-uvYpBOG3wZjz9z3AeGulqAci-OU" />
     </application>
 
 </manifest>

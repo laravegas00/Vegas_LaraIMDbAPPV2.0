@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.firebase.firestore)
     implementation(libs.lifecycle.process)
+    implementation(libs.firebase.storage)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
@@ -63,5 +64,11 @@ dependencies {
     implementation ("com.squareup.picasso:picasso:2.71828")
 
     implementation ("com.facebook.android:facebook-login:latest.release")
+
+    implementation("com.hbb20:ccp:2.5.2")
+    implementation("com.google.android.libraries.places:places:3.2.0")
+    implementation("com.google.android.gms:play-services-maps:18.1.0")
+    implementation("com.google.android.gms:play-services-places:17.0.0")
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 
 }

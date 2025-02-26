@@ -3,9 +3,12 @@ package edu.pmdm.vegas_laraimdbapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.Menu;
 import android.widget.Button;
@@ -21,8 +24,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 
-import androidx.lifecycle.ProcessLifecycleOwner;
+import androidx.annotation.NonNull;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
@@ -30,9 +34,12 @@ import androidx.navigation.ui.NavigationUI;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.Map;
+
 import edu.pmdm.vegas_laraimdbapp.database.FavoriteDatabase;
+import edu.pmdm.vegas_laraimdbapp.database.FavoritesManager;
 import edu.pmdm.vegas_laraimdbapp.databinding.ActivityMainBinding;
-import edu.pmdm.vegas_laraimdbapp.sync.FavoritesSyncManager;
+import edu.pmdm.vegas_laraimdbapp.sync.UserSyncManager;
 import edu.pmdm.vegas_laraimdbapp.utils.AppLifecycleManager;
 
 /**
@@ -40,11 +47,13 @@ import edu.pmdm.vegas_laraimdbapp.utils.AppLifecycleManager;
  */
 public class MainActivity extends AppCompatActivity {
 
-    // Declaración de variables
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
     private FavoriteDatabase databaseHelper;
-
+    private FirebaseFirestore db;
+    private NavigationView navigationView;
+    private String userId;
+    private boolean isUserLoggingOut;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,20 +62,33 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        setSupportActionBar(binding.appBarMain.toolbar); // Configurar la Toolbar
+        setSupportActionBar(binding.appBarMain.toolbar);
 
-        // Inicializar la base de datos local
+        UserSyncManager userSyncManager = new UserSyncManager(this);
+
         databaseHelper = new FavoriteDatabase(this);
+        FavoritesManager favoritesManager = FavoritesManager.getInstance(this);
+        db = FirebaseFirestore.getInstance();
 
-        // Inicializar Lifecycle Manager para registrar eventos del ciclo de vida
-        ProcessLifecycleOwner.get().getLifecycle().addObserver(new AppLifecycleManager(this));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            registerActivityLifecycleCallbacks(new AppLifecycleManager(this));
+        }
+
+        // Obtener el usuario actual de Firebase
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            String userId = user.getUid();
+
+            // Sincronizar datos del usuario y favoritos
+            userSyncManager.syncUserData(userId);
+            favoritesManager.syncFavoritesFromFirestore();
+        }
 
 
-        // Configurar el Navigation Drawer
+        // Configuración del Navigation Drawer
         DrawerLayout drawer = binding.drawerLayout;
-        NavigationView navigationView = binding.navView;
+        navigationView = binding.navView;
 
-        // Configurar la navegación
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home, R.id.nav_gallery, R.id.nav_slideshow)
                 .setOpenableLayout(drawer)
@@ -75,78 +97,137 @@ public class MainActivity extends AppCompatActivity {
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
 
-        // Obtener datos del intent
-        Intent intent = getIntent();
-        String name = intent.getStringExtra("name");
-        String email = intent.getStringExtra("email");
-        String photoUrl = intent.getStringExtra("photoUrl");
-
-        // Actualizar UI del encabezado del Navigation Drawer
-        View headerView = navigationView.getHeaderView(0);
-        TextView nameTextView = headerView.findViewById(R.id.nav_header_name);
-        TextView emailTextView = headerView.findViewById(R.id.nav_header_email);
-        ImageView photoImageView = headerView.findViewById(R.id.nav_header_image);
-
-        // Mostrar datos del usuario en el encabezado
-        nameTextView.setText(name);
-        emailTextView.setText(email);
-
-        Glide.with(this)
-                .load(photoUrl != null ? photoUrl : "https://lh3.googleusercontent.com/a/default-user")
-                .into(photoImageView);
-
+        // Sincronizar favoritos de Firestore a SQLite al iniciar sesión
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            FavoritesSyncManager syncManager = new FavoritesSyncManager(this);
-            syncManager.syncLocalWithFirestore(this);
-        }, 5000); // ✅ Espera 5 segundos antes de sincronizar
-
+            favoritesManager.syncFavoritesFromFirestore();
+        }, 3000);
 
         // Configurar el botón de logout
+        View headerView = navigationView.getHeaderView(0);
         Button logoutButton = headerView.findViewById(R.id.nav_header_logout_button);
-        logoutButton.setOnClickListener(v -> cerrarSesion()); // Llamada al método de cierre de sesión
+        logoutButton.setOnClickListener(v -> cerrarSesion());
 
+        updateNavigationHeader(); // Carga datos de usuario desde SharedPreferences
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            updateNavigationHeader();
+        }
+    }
+
 
     /**
      * Método para cerrar la sesión del usuario.
      */
+    private void updateNavigationHeader() {
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        View headerView = navigationView.getHeaderView(0);
+        TextView navUsername = headerView.findViewById(R.id.nav_header_name);
+        TextView navEmail = headerView.findViewById(R.id.nav_header_email);
+        ImageView navProfileImage = headerView.findViewById(R.id.nav_header_image);
+
+        SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
+        String userId = sharedPreferences.getString("userId", null);
+
+        if (userId == null) {
+            return;
+        }
+
+        // Obtener datos de Firestore y actualizar SQLite y SharedPreferences
+        db.collection("users").document(userId).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        Map<String, Object> userData = documentSnapshot.getData();
+                        if (userData != null) {
+                            String name = documentSnapshot.getString("name");
+                            String email = documentSnapshot.getString("email");
+                            String imagePath = documentSnapshot.getString("profileImage");
+                            String lastLogin = documentSnapshot.getString("lastLogin");
+                            String lastLogout = documentSnapshot.getString("lastLogout");
+                            String address = documentSnapshot.getString("address");
+                            String phone = documentSnapshot.getString("phone");
+
+
+                            navUsername.setText(name);
+                            navEmail.setText(email);
+                            Glide.with(this).load(imagePath).circleCrop().into(navProfileImage);
+
+                            // Guardar en SharedPreferences
+                            SharedPreferences.Editor editor = sharedPreferences.edit();
+                            editor.putString("name", name);
+                            editor.putString("email", email);
+                            editor.putString("profileImagePath", imagePath);
+                            editor.putString("lastLogin", lastLogin);
+                            editor.putString("lastLogout", lastLogout);
+                            editor.putString("address", address);
+                            editor.putString("phone", phone);
+                            editor.apply();
+
+                            // Guardar en SQLite
+                            databaseHelper.updateUser(userId, name, email, imagePath, lastLogin, lastLogout, address, phone);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> Log.e("MainActivity", "Error al obtener datos de Firestore", e));
+
+        Log.d("MainActivity", "Datos de usuario actualizados en Navigation Drawer.");
+    }
+
+
     private void cerrarSesion() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
             String userId = user.getUid();
-
-            // Registrar el logout en la base de datos local
             String logoutTime = getCurrentDateTime();
-            databaseHelper.registerLogout(userId, logoutTime);
+
+            // Crear instancia de UserSyncManager
+            UserSyncManager userSyncManager = new UserSyncManager(this);
+
+            // Registrar logout en Firestore, SQLite y SharedPreferences
+            userSyncManager.registerLogout(user.getUid());
         }
 
-        // Cerrar sesión de Google
+        // Cerrar sesión en Firebase y Google
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .build();
         GoogleSignInClient googleSignInClient = GoogleSignIn.getClient(this, gso);
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            // Cerrar sesión de Firebase
-            FirebaseAuth.getInstance().signOut();
+        googleSignInClient.signOut();
 
-            // Cerrar sesión de Facebook
-            LoginManager.getInstance().logOut();
+        FirebaseAuth.getInstance().signOut();
+        LoginManager.getInstance().logOut();
 
-            // Eliminar datos de SharedPreferences
-            SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            editor.clear(); // Elimina todos los datos guardados
-            editor.apply();
+        // Limpiar SharedPreferences
+        SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        sharedPreferences.edit().clear().apply();
 
-            // Mostrar mensaje de cierre de sesión
-            Toast.makeText(this, "Sesión cerrada correctamente", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Sesión cerrada correctamente", Toast.LENGTH_SHORT).show();
 
-            // Redirigir al usuario a la pantalla de inicio de sesión
-            Intent intent = new Intent(this, LogInActivity.class);
-            startActivity(intent);
-            finish(); // Finalizar MainActivity
-        });
+        // Redirigir a LogInActivity
+        startActivity(new Intent(this, LogInActivity.class));
+        finish();
     }
+
+    private void loadUserProfileImage(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            //Establecer una imagen por defecto si la URL es nula
+            imageUrl = "android.resource://" + getPackageName() + "/drawable/default_user_icon";
+        }
+
+        ImageView imageView = findViewById(R.id.nav_header_image);
+
+        Glide.with(this)
+                .load(imageUrl)
+                .placeholder(R.drawable.ic_android) // Imagen de carga
+                .error(R.drawable.error) // Imagen de error
+                .into(imageView);
+    }
+
 
     private String getCurrentDateTime() {
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -159,14 +240,26 @@ public class MainActivity extends AppCompatActivity {
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
-            String userId = user.getUid();
+            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
             String logoutTime = getCurrentDateTime();
-
-            // Registrar el logout en la base de datos local
             databaseHelper.registerLogout(userId, logoutTime);
         }
     }
 
+    //maneja la selecion de opciones en el menu
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.nav_edit_user) { // Detecta la opción "Editar Usuario"
+            // Abre la actividad EditUserActivity
+            Intent intent = new Intent(MainActivity.this, EditUserActivity.class);
+            startActivity(intent);
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
